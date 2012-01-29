@@ -1,13 +1,39 @@
 # clj-aws-s3
 
-FIXME: write description
+A Clojure library for accessing Amazon S3, based on the official AWS
+Java SDK.
 
-## Usage
+Although there are a few S3 clients for Clojure around, this library
+aims to provide a more complete implementation, with metadata, streams
+and protocols for uploading different types of data.
 
-FIXME: write
+Currently the library supports functions to create and delete buckets,
+and to list, get, and put objects and their metadata.
+
+It doesn't support ACLs yet, but will do in a future release.
+
+## Install
+
+Add the following dependency to your `project.clj` file:
+
+    [clj-aws-s3 "0.1.0"]
+
+## Example
+
+```clojure
+(require '[aws.sdk.s3 :as s3])
+
+(def cred {:access-key "...", :secret-key "..."})
+
+(s3/create-bucket cred "my-bucket")
+
+(s3/put-object cred "my-bucket" "some-key" "some-value")
+
+(println (slurp (:content (s3/get-object cred "my-bucket" "some-key"))))
+```
 
 ## License
 
-Copyright (C) 2012 FIXME
+Copyright (C) 2012 James Reeves
 
 Distributed under the Eclipse Public License, the same as Clojure.
