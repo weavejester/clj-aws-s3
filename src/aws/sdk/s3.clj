@@ -175,3 +175,8 @@
     :truncated? - true if the list of objects was truncated"
   [cred bucket & [prefix]]
   (to-map (.listObjects (s3-client cred) bucket prefix)))
+
+(defn delete-object
+  "Delete an object from an S3 bucket."
+  [cred bucket key]
+  (.deleteObject (s3-client cred) bucket key))
