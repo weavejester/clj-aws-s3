@@ -6,7 +6,12 @@
   (:import com.amazonaws.auth.BasicAWSCredentials
            com.amazonaws.services.s3.AmazonS3Client
            com.amazonaws.AmazonServiceException
-           com.amazonaws.services.s3.model.ObjectMetadata))
+           com.amazonaws.services.s3.model.ObjectMetadata
+           com.amazonaws.services.s3.model.PutObjectRequest
+           java.io.ByteArrayInputStream
+           java.io.File
+           java.io.InputStream
+           java.nio.charset.Charset))
 
 (defn- s3-client
   "Create an AmazonS3Client instance from a map of credentials."
@@ -30,3 +35,65 @@
   "Delete the S3 bucket with the supplied name."
   [cred name]
   (.deleteBucket (s3-client cred) name))
+
+(defprotocol ToPutRequest
+  "A protocol for constructing a map that represents an S3 put request."
+  (put-request [x] "Convert a value into a put request."))
+
+(extend-protocol ToPutRequest
+  InputStream
+  (put-request [is] {:input-stream is})
+  File
+  (put-request [f] {:file f})
+  String
+  (put-request [s]
+    {:input-stream     (ByteArrayInputStream. (.getBytes s))
+     :content-length   (count s)
+     :content-encoding (.name (Charset/defaultCharset))}))
+
+(defmacro set-attr
+  "Set an attribute on an object if not nil."
+  {:private true}
+  [object setter value]
+  `(if-let [v# ~value]
+     (~setter ~object v#)))
+
+(defn- map->ObjectMetadata
+  "Convert a map of object metadata into a ObjectMetadata instance."
+  [metadata]
+  (doto (ObjectMetadata.)
+    (set-attr .setCacheControl         (:cache-control metadata))
+    (set-attr .setContentDisposition   (:content-disposition metadata))
+    (set-attr .setContentEncoding      (:content-encoding metadata))
+    (set-attr .setContentLength        (:content-length metadata))
+    (set-attr .setContentMD5           (:content-md5 metadata))
+    (set-attr .setContentType          (:content-type metadata))
+    (set-attr .setServerSideEncryption (:server-side-encryption metadata))
+    (set-attr .setUserMetadata
+     (dissoc metadata :cache-control
+                      :content-disposition
+                      :content-encoding
+                      :content-length
+                      :content-md5
+                      :content-type
+                      :server-size-encryption))))
+
+(defn- ->PutObjectRequest
+  "Create a PutObjectRequest instance from a bucket name, key and put request
+  map."
+  [bucket key request]
+  (cond
+   (:file request)
+     (PutObjectRequest. bucket key (:file request))
+   (:input-stream request)
+     (PutObjectRequest.
+      bucket key
+      (:input-stream request)
+      (map->ObjectMetadata (dissoc request :input-stream)))))
+
+(defn put-object
+  "Put a value into an S3 bucket at the specified key."
+  [cred bucket key value]
+  (->> (put-request value)
+       (->PutObjectRequest bucket key)
+       (.putObject (s3-client cred))))
