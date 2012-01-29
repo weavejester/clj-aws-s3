@@ -180,3 +180,14 @@
   "Delete an object from an S3 bucket."
   [cred bucket key]
   (.deleteObject (s3-client cred) bucket key))
+
+(defn object-exists?
+  "Returns true if an object exists in the supplied bucket and key."
+  [cred bucket key]
+  (try
+    (get-object-metadata cred bucket key)
+    true
+    (catch AmazonServiceException e
+      (if (= 404 (.getStatusCode e))
+        false
+        (throw e)))))
