@@ -7,8 +7,10 @@
            com.amazonaws.services.s3.AmazonS3Client
            com.amazonaws.AmazonServiceException
            com.amazonaws.services.s3.model.ObjectMetadata
+           com.amazonaws.services.s3.model.ObjectListing
            com.amazonaws.services.s3.model.PutObjectRequest
            com.amazonaws.services.s3.model.S3Object
+           com.amazonaws.services.s3.model.S3ObjectSummary
            java.io.ByteArrayInputStream
            java.io.File
            java.io.InputStream
@@ -122,7 +124,20 @@
      :content-type           (.getContentType metadata)
      :etag                   (.getETag metadata)
      :last-modified          (.getLastModified metadata)
-     :server-side-encryption (.getServerSideEncryption metadata)}))
+     :server-side-encryption (.getServerSideEncryption metadata)})
+  ObjectListing
+  (to-map [listing]
+    {:bucket     (.getBucketName listing)
+     :objects    (map to-map (.getObjectSummaries listing))
+     :prefix     (.getPrefix listing)
+     :truncated? (.isTruncated listing)})
+  S3ObjectSummary
+  (to-map [summary]
+    {:metadata {:content-length (.getSize summary)
+                :etag           (.getETag summary)
+                :last-modified  (.getLastModified summary)}
+     :bucket   (.getBucketName summary)
+     :key      (.getKey summary)}))
 
 (defn get-object
   "Get an object from an S3 bucket. The object is returned as a map with the
@@ -148,3 +163,15 @@
     :server-side-encryption - the server-side encryption algorithm"
   [cred bucket key]
   (to-map (.getObjectMetadata (s3-client cred) bucket key)))
+
+(defn list-objects
+  "List the objects in an S3 bucket. An optional prefix may be supplied, and
+  only the objects with that prefix will be returned.
+
+  The object listing will be returned as a map containing the following keys:
+    :bucket     - the name of the bucket
+    :prefix     - the supplied prefix (or nil if none supplied)
+    :objects    - a list of objects
+    :truncated? - true if the list of objects was truncated"
+  [cred bucket & [prefix]]
+  (to-map (.listObjects (s3-client cred) bucket prefix)))
