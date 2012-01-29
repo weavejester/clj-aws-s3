@@ -120,6 +120,8 @@
      :content-length         (.getContentLength metadata)
      :content-md5            (.getContentMD5 metadata)
      :content-type           (.getContentType metadata)
+     :etag                   (.getETag metadata)
+     :last-modified          (.getLastModified metadata)
      :server-side-encryption (.getServerSideEncryption metadata)}))
 
 (defn get-object
@@ -131,3 +133,18 @@
     :key      - the object's key"
   [cred bucket key]
   (to-map (.getObject (s3-client cred) bucket key)))
+
+(defn get-object-metadata
+  "Get an object's metadata from a bucket. The metadata is a map with the
+  following keys:
+    :cache-control          - the CacheControl HTTP header
+    :content-disposition    - the ContentDisposition HTTP header
+    :content-encoding       - the character encoding of the content
+    :content-length         - the length of the content in bytes
+    :content-md5            - the MD5 hash of the content
+    :content-type           - the mime-type of the content
+    :etag                   - the HTTP ETag header
+    :last-modified          - the last modified date
+    :server-side-encryption - the server-side encryption algorithm"
+  [cred bucket key]
+  (to-map (.getObjectMetadata (s3-client cred) bucket key)))
