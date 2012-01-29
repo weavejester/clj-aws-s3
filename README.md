@@ -16,7 +16,7 @@ It doesn't support ACLs yet, but will do in a future release.
 
 Add the following dependency to your `project.clj` file:
 
-    [clj-aws-s3 "0.1.0"]
+    [clj-aws-s3 "0.1.1"]
 
 ## Example
 
