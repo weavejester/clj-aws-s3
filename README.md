@@ -32,6 +32,10 @@ Add the following dependency to your `project.clj` file:
 (println (slurp (:content (s3/get-object cred "my-bucket" "some-key"))))
 ```
 
+## Documentation
+
+* [API docs](http://weavejester.github.com/clj-aws-s3/)
+
 ## License
 
 Copyright (C) 2012 James Reeves
