@@ -8,6 +8,7 @@
            com.amazonaws.AmazonServiceException
            com.amazonaws.services.s3.model.ObjectMetadata
            com.amazonaws.services.s3.model.PutObjectRequest
+           com.amazonaws.services.s3.model.S3Object
            java.io.ByteArrayInputStream
            java.io.File
            java.io.InputStream
@@ -92,8 +93,41 @@
       (map->ObjectMetadata (dissoc request :input-stream)))))
 
 (defn put-object
-  "Put a value into an S3 bucket at the specified key."
+  "Put a value into an S3 bucket at the specified key. The value can be
+  a String, InputStream or File (or anything that implements the ToPutRequest
+  protocol)."
   [cred bucket key value]
   (->> (put-request value)
        (->PutObjectRequest bucket key)
        (.putObject (s3-client cred))))
+
+(defprotocol Mappable
+  "Convert a value into a Clojure map."
+  (to-map [x] "Return a map of the value."))
+
+(extend-protocol Mappable
+  S3Object
+  (to-map [object]
+    {:content  (.getObjectContent object)
+     :metadata (to-map (.getObjectMetadata object))
+     :bucket   (.getBucketName object)
+     :key      (.getKey object)})
+  ObjectMetadata
+  (to-map [metadata]
+    {:cache-control          (.getCacheControl metadata)
+     :content-disposition    (.getContentDisposition metadata)
+     :content-encoding       (.getContentEncoding metadata)
+     :content-length         (.getContentLength metadata)
+     :content-md5            (.getContentMD5 metadata)
+     :content-type           (.getContentType metadata)
+     :server-side-encryption (.getServerSideEncryption metadata)}))
+
+(defn get-object
+  "Get an object from an S3 bucket. The object is returned as a map with the
+  following keys:
+    :content  - an InputStream to the content
+    :metadata - a map of the object's metadata
+    :bucket   - the name of the bucket
+    :key      - the object's key"
+  [cred bucket key]
+  (to-map (.getObject (s3-client cred) bucket key)))
