@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html><head><link href="css/default.css" rel="stylesheet" type="text/css"><script src="js/jquery.min.js" type="text/javascript"></script><script src="js/page_effects.js" type="text/javascript"></script><title>aws.sdk.s3 documentation</title></head><body><div id="header"><h1><a href="index.html">Clj-aws-s3 0.1.1 API documentation</a></h1></div><div class="sidebar" id="namespaces"><h3>Namespaces</h3><ul><li class="current"><a href="aws.sdk.s3.html">aws.sdk.s3</a></li></ul></div><div class="sidebar" id="vars"><h3>Public Vars</h3><ul><li><a href="aws.sdk.s3.html#var-Mappable">Mappable</a></li><li><a href="aws.sdk.s3.html#var-ToPutRequest">ToPutRequest</a></li><li><a href="aws.sdk.s3.html#var-bucket-exists%3F">bucket-exists?</a></li><li><a href="aws.sdk.s3.html#var-create-bucket">create-bucket</a></li><li><a href="aws.sdk.s3.html#var-delete-bucket">delete-bucket</a></li><li><a href="aws.sdk.s3.html#var-delete-object">delete-object</a></li><li><a href="aws.sdk.s3.html#var-get-object">get-object</a></li><li><a href="aws.sdk.s3.html#var-get-object-metadata">get-object-metadata</a></li><li><a href="aws.sdk.s3.html#var-list-objects">list-objects</a></li><li><a href="aws.sdk.s3.html#var-object-exists%3F">object-exists?</a></li><li><a href="aws.sdk.s3.html#var-put-object">put-object</a></li><li><a href="aws.sdk.s3.html#var-put-request">put-request</a></li><li><a href="aws.sdk.s3.html#var-to-map">to-map</a></li></ul></div><div class="namespace-docs" id="content"><h2>aws.sdk.s3 documentation</h2><pre class="doc">Functions to access the Amazon S3 storage service.
+<html><head><link href="css/default.css" rel="stylesheet" type="text/css"><script src="js/jquery.min.js" type="text/javascript"></script><script src="js/page_effects.js" type="text/javascript"></script><title>aws.sdk.s3 documentation</title></head><body><div id="header"><h1><a href="index.html">Clj-aws-s3 0.2.0 API documentation</a></h1></div><div class="sidebar" id="namespaces"><h3>Namespaces</h3><ul><li class="current"><a href="aws.sdk.s3.html">aws.sdk.s3</a></li></ul></div><div class="sidebar" id="vars"><h3>Public Vars</h3><ul><li><a href="aws.sdk.s3.html#var-Mappable">Mappable</a></li><li><a href="aws.sdk.s3.html#var-ToPutRequest">ToPutRequest</a></li><li><a href="aws.sdk.s3.html#var-bucket-exists%3F">bucket-exists?</a></li><li><a href="aws.sdk.s3.html#var-create-bucket">create-bucket</a></li><li><a href="aws.sdk.s3.html#var-delete-bucket">delete-bucket</a></li><li><a href="aws.sdk.s3.html#var-delete-object">delete-object</a></li><li><a href="aws.sdk.s3.html#var-get-object">get-object</a></li><li><a href="aws.sdk.s3.html#var-get-object-metadata">get-object-metadata</a></li><li><a href="aws.sdk.s3.html#var-list-objects">list-objects</a></li><li><a href="aws.sdk.s3.html#var-object-exists%3F">object-exists?</a></li><li><a href="aws.sdk.s3.html#var-put-object">put-object</a></li><li><a href="aws.sdk.s3.html#var-put-request">put-request</a></li><li><a href="aws.sdk.s3.html#var-to-map">to-map</a></li></ul></div><div class="namespace-docs" id="content"><h2>aws.sdk.s3 documentation</h2><pre class="doc">Functions to access the Amazon S3 storage service.
 
 Each function takes a map of credentials as its first argument. The
 credentials map should contain an :access-key key and a :secret-key key.</pre><div class="public" id="var-Mappable"><h3>Mappable</h3><div class="usage"></div><pre class="doc">Convert a value into a Clojure map.
@@ -23,14 +23,22 @@ following keys:
   :content-type           - the mime-type of the content
   :etag                   - the HTTP ETag header
   :last-modified          - the last modified date
-  :server-side-encryption - the server-side encryption algorithm</pre></div><div class="public" id="var-list-objects"><h3>list-objects</h3><div class="usage"><code>(list-objects cred bucket &amp; [prefix])</code></div><pre class="doc">List the objects in an S3 bucket. An optional prefix may be supplied, and
-only the objects with that prefix will be returned.
+  :server-side-encryption - the server-side encryption algorithm</pre></div><div class="public" id="var-list-objects"><h3>list-objects</h3><div class="usage"><code>(list-objects cred bucket &amp; [options])</code></div><pre class="doc">List the objects in an S3 bucket. A optional map of options may be supplied.
+Available options are:
+  :delimiter - read only keys up to the next delimiter (such as a '/')
+  :marker    - read objects after this key
+  :max-keys  - read only this many objects
+  :prefix    - read only objects with this prefix
 
 The object listing will be returned as a map containing the following keys:
-  :bucket     - the name of the bucket
-  :prefix     - the supplied prefix (or nil if none supplied)
-  :objects    - a list of objects
-  :truncated? - true if the list of objects was truncated</pre></div><div class="public" id="var-object-exists%3F"><h3>object-exists?</h3><div class="usage"><code>(object-exists? cred bucket key)</code></div><pre class="doc">Returns true if an object exists in the supplied bucket and key.
+  :bucket          - the name of the bucket
+  :prefix          - the supplied prefix (or nil if none supplied)
+  :objects         - a list of objects
+  :common-prefixes - the common prefixes of keys omitted by the delimiter
+  :max-keys        - the maximum number of objects to be returned
+  :truncated?      - true if the list of objects was truncated
+  :marker          - the marker of the listing
+  :next-marker     - the next marker of the listing</pre></div><div class="public" id="var-object-exists%3F"><h3>object-exists?</h3><div class="usage"><code>(object-exists? cred bucket key)</code></div><pre class="doc">Returns true if an object exists in the supplied bucket and key.
 </pre></div><div class="public" id="var-put-object"><h3>put-object</h3><div class="usage"><code>(put-object cred bucket key value)</code></div><pre class="doc">Put a value into an S3 bucket at the specified key. The value can be
 a String, InputStream or File (or anything that implements the ToPutRequest
 protocol).</pre></div><div class="public" id="var-put-request"><h3>put-request</h3><div class="usage"><code>(put-request x)</code></div><pre class="doc">Convert a value into a put request.
