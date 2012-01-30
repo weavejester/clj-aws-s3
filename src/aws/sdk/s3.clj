@@ -6,6 +6,7 @@
   (:import com.amazonaws.auth.BasicAWSCredentials
            com.amazonaws.services.s3.AmazonS3Client
            com.amazonaws.AmazonServiceException
+           com.amazonaws.services.s3.model.ListObjectsRequest
            com.amazonaws.services.s3.model.ObjectMetadata
            com.amazonaws.services.s3.model.ObjectListing
            com.amazonaws.services.s3.model.PutObjectRequest
@@ -127,10 +128,14 @@
      :server-side-encryption (.getServerSideEncryption metadata)})
   ObjectListing
   (to-map [listing]
-    {:bucket     (.getBucketName listing)
-     :objects    (map to-map (.getObjectSummaries listing))
-     :prefix     (.getPrefix listing)
-     :truncated? (.isTruncated listing)})
+    {:bucket          (.getBucketName listing)
+     :objects         (map to-map (.getObjectSummaries listing))
+     :prefix          (.getPrefix listing)
+     :common-prefixes (seq (.getCommonPrefixes listing))
+     :truncated?      (.isTruncated listing)
+     :max-keys        (.getMaxKeys listing)
+     :marker          (.getMarker listing)
+     :next-marker     (.getNextMarker listing)})
   S3ObjectSummary
   (to-map [summary]
     {:metadata {:content-length (.getSize summary)
@@ -164,17 +169,38 @@
   [cred bucket key]
   (to-map (.getObjectMetadata (s3-client cred) bucket key)))
 
+(defn- map->ListObjectsRequest
+  "Create a ListObjectsRequest instance from a map of values."
+  [request]
+  (doto (ListObjectsRequest.)
+    (set-attr .setBucketName (:bucket request))
+    (set-attr .setDelimiter  (:delimiter request))
+    (set-attr .setMarker     (:marker request))
+    (set-attr .setMaxKeys    (:max-keys request))
+    (set-attr .setPrefix     (:prefix request))))
+
 (defn list-objects
-  "List the objects in an S3 bucket. An optional prefix may be supplied, and
-  only the objects with that prefix will be returned.
+  "List the objects in an S3 bucket. A optional map of options may be supplied.
+  Available options are:
+    :delimiter - read only keys up to the next delimiter (such as a '/')
+    :marker    - read objects after this key
+    :max-keys  - read only this many objects
+    :prefix    - read only objects with this prefix
 
   The object listing will be returned as a map containing the following keys:
-    :bucket     - the name of the bucket
-    :prefix     - the supplied prefix (or nil if none supplied)
-    :objects    - a list of objects
-    :truncated? - true if the list of objects was truncated"
-  [cred bucket & [prefix]]
-  (to-map (.listObjects (s3-client cred) bucket prefix)))
+    :bucket          - the name of the bucket
+    :prefix          - the supplied prefix (or nil if none supplied)
+    :objects         - a list of objects
+    :common-prefixes - the common prefixes of keys omitted by the delimiter
+    :max-keys        - the maximum number of objects to be returned
+    :truncated?      - true if the list of objects was truncated
+    :marker          - the marker of the listing
+    :next-marker     - the next marker of the listing"
+  [cred bucket & [options]]
+  (to-map
+   (.listObjects
+    (s3-client cred)
+    (map->ListObjectsRequest (merge {:bucket bucket} options)))))
 
 (defn delete-object
   "Delete an object from an S3 bucket."
