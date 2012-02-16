@@ -40,9 +40,9 @@
   [cred name]
   (.deleteBucket (s3-client cred) name))
 
-(defprotocol ToPutRequest
+(defprotocol ^{:no-doc true} ToPutRequest
   "A protocol for constructing a map that represents an S3 put request."
-  (put-request [x] "Convert a value into a put request."))
+  (^{:no-doc true} put-request [x] "Convert a value into a put request."))
 
 (extend-protocol ToPutRequest
   InputStream
@@ -104,9 +104,9 @@
        (->PutObjectRequest bucket key)
        (.putObject (s3-client cred))))
 
-(defprotocol Mappable
+(defprotocol ^{:no-doc true} Mappable
   "Convert a value into a Clojure map."
-  (to-map [x] "Return a map of the value."))
+  (^{:no-doc true} to-map [x] "Return a map of the value."))
 
 (extend-protocol Mappable
   S3Object
