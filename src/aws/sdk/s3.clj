@@ -217,3 +217,10 @@
       (if (= 404 (.getStatusCode e))
         false
         (throw e)))))
+
+(defn copy-object
+  "Copy an existing S3 object to another key."
+  ([cred bucket src-key dest-key]
+     (copy-object cred bucket src-key bucket dest-key))
+  ([cred src-bucket src-key dest-bucket dest-key]
+     (.copyObject (s3-client cred) src-bucket src-key dest-bucket dest-key)))
