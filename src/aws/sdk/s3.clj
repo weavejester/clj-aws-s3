@@ -6,6 +6,7 @@
   (:import com.amazonaws.auth.BasicAWSCredentials
            com.amazonaws.services.s3.AmazonS3Client
            com.amazonaws.AmazonServiceException
+           com.amazonaws.services.s3.model.CopyObjectRequest
            com.amazonaws.services.s3.model.ListObjectsRequest
            com.amazonaws.services.s3.model.ObjectMetadata
            com.amazonaws.services.s3.model.ObjectListing
@@ -144,6 +145,18 @@
      :bucket   (.getBucketName summary)
      :key      (.getKey summary)}))
 
+(defn get-object-meta [cred bucket key]
+  (.getObjectMetadata (s3-client cred) bucket key))
+
+(defn set-object-meta [cred bucket key newmeta]
+  (.setObjectMetadata (s3-client cred) bucket key newmeta))
+
+(defn get-object-acl [cred bucket key]
+  (.getObjectAcl (s3-client cred) bucket key))
+
+(defn set-object-acl [cred bucket key acl]
+  (.setObjectAcl (s3-client cred) bucket key acl))
+
 (defn get-object
   "Get an object from an S3 bucket. The object is returned as a map with the
   following keys:
@@ -219,8 +232,20 @@
         (throw e)))))
 
 (defn copy-object
-  "Copy an existing S3 object to another key."
+  "Copy an existing S3 object to another key.
+
+   TODO add destructive :overwrite option for meta."
   ([cred bucket src-key dest-key]
      (copy-object cred bucket src-key bucket dest-key))
   ([cred src-bucket src-key dest-bucket dest-key]
-     (.copyObject (s3-client cred) src-bucket src-key dest-bucket dest-key)))
+     (copy-object src-bucket src-key dest-bucket dest-key {}))
+  ([cred src-bucket src-key dest-bucket dest-key newmeta]
+     (let [acl (get-object-acl cred src-bucket src-key)
+           ometa (get-object-meta cred src-bucket src-key)
+           cobj (CopyObjectRequest. src-bucket src-key
+                                    dest-bucket dest-key)]
+       (doseq [[k v] newmeta]
+         (.addUserMetadata ometa k v))
+       (.setNewObjectMetadata cobj ometa)
+       (.copyObject (s3-client cred) cobj)
+       (set-object-acl cred dest-bucket dest-key acl))))
