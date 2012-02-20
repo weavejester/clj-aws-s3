@@ -232,16 +232,16 @@
         (throw e)))))
 
 (defn copy-object
-  "Copy an existing S3 object to another key.
-
-   TODO add destructive :overwrite option for meta."
+  "Copy an existing S3 object to another key."
   ([cred bucket src-key dest-key]
      (copy-object cred bucket src-key bucket dest-key))
   ([cred src-bucket src-key dest-bucket dest-key]
-     (copy-object src-bucket src-key dest-bucket dest-key {}))
-  ([cred src-bucket src-key dest-bucket dest-key newmeta]
+     (copy-object src-bucket src-key dest-bucket dest-key {} true))
+  ([cred src-bucket src-key dest-bucket dest-key newmeta keepmeta?]
      (let [acl (get-object-acl cred src-bucket src-key)
-           ometa (get-object-meta cred src-bucket src-key)
+           ometa (if keepmeta?
+                   (get-object-meta cred src-bucket src-key)
+                   (ObjectMetadata.))
            cobj (CopyObjectRequest. src-bucket src-key
                                     dest-bucket dest-key)]
        (doseq [[k v] newmeta]
