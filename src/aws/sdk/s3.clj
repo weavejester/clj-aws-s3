@@ -17,13 +17,17 @@
            java.io.InputStream
            java.nio.charset.Charset))
 
-(defn- s3-client
+(defn- s3-client*
   "Create an AmazonS3Client instance from a map of credentials."
   [cred]
   (AmazonS3Client.
    (BasicAWSCredentials.
     (:access-key cred)
     (:secret-key cred))))
+
+(def ^{:private true}
+  s3-client
+  (memoize s3-client*))
 
 (defn bucket-exists?
   "Returns true if the supplied bucket name already exists in S3."
