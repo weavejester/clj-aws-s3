@@ -12,6 +12,7 @@
            com.amazonaws.services.s3.model.PutObjectRequest
            com.amazonaws.services.s3.model.S3Object
            com.amazonaws.services.s3.model.S3ObjectSummary
+           com.amazonaws.services.s3.model.CannedAccessControlList
            java.io.ByteArrayInputStream
            java.io.File
            java.io.InputStream
@@ -224,3 +225,23 @@
      (copy-object cred bucket src-key bucket dest-key))
   ([cred src-bucket src-key dest-bucket dest-key]
      (.copyObject (s3-client cred) src-bucket src-key dest-bucket dest-key)))
+
+(defn get-object-acl
+  "Returns object ACL (AccessControlList)"
+  [cred bucket key]
+  (.getObjectAcl (s3-client cred) bucket key))
+
+(defn set-object-acl
+  "Sets object ACL to one of CannedAccessControlList where canned-acl is one of:
+
+   - :private
+   - :public-read
+   - :public-read-write
+
+   see: http://docs.amazonwebservices.com/AWSJavaSDK/latest/javadoc/com/amazonaws/services/s3/model/CannedAccessControlList.html"
+  [cred bucket key canned-acl]
+  (let [acl (condp = canned-acl
+                :private           CannedAccessControlList/Private
+                :public-read       CannedAccessControlList/PublicRead
+                :public-read-write CannedAccessControlList/PublicReadWrite)]
+    (.setObjectAcl (s3-client cred) bucket key acl)))
