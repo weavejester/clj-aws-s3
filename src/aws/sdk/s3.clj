@@ -6,6 +6,8 @@
   (:import com.amazonaws.auth.BasicAWSCredentials
            com.amazonaws.services.s3.AmazonS3Client
            com.amazonaws.AmazonServiceException
+           com.amazonaws.services.s3.model.Bucket
+           com.amazonaws.services.s3.model.Owner
            com.amazonaws.services.s3.model.ListObjectsRequest
            com.amazonaws.services.s3.model.ObjectMetadata
            com.amazonaws.services.s3.model.ObjectListing
@@ -29,6 +31,23 @@
   s3-client
   (memoize s3-client*))
 
+(defprotocol ^{:no-doc true} Mappable
+  "Convert a value into a Clojure map."
+  (^{:no-doc true} to-map [x] "Return a map of the value."))
+
+(extend-protocol Mappable
+  Bucket
+  (to-map [bucket]
+    {:name          (.getName bucket)
+     :creation-date (.getCreationDate bucket)
+     :owner         (to-map (.getOwner bucket))})
+  Owner
+  (to-map [owner]
+    {:id           (.getId owner)
+     :display-name (.getDisplayName owner)})
+  nil
+  (to-map [_] nil))
+
 (defn bucket-exists?
   "Returns true if the supplied bucket name already exists in S3."
   [cred name]
@@ -37,12 +56,17 @@
 (defn create-bucket
   "Create a new S3 bucket with the supplied name."
   [cred name]
-  (.createBucket (s3-client cred) name))
+  (to-map (.createBucket (s3-client cred) name)))
 
 (defn delete-bucket
   "Delete the S3 bucket with the supplied name."
   [cred name]
   (.deleteBucket (s3-client cred) name))
+
+(defn list-buckets
+  "List all the S3 buckets for the supplied credentials."
+  [cred]
+  (map to-map (.listBuckets (s3-client cred))))
 
 (defprotocol ^{:no-doc true} ToPutRequest
   "A protocol for constructing a map that represents an S3 put request."
@@ -107,10 +131,6 @@
   (->> (put-request value)
        (->PutObjectRequest bucket key)
        (.putObject (s3-client cred))))
-
-(defprotocol ^{:no-doc true} Mappable
-  "Convert a value into a Clojure map."
-  (^{:no-doc true} to-map [x] "Return a map of the value."))
 
 (extend-protocol Mappable
   S3Object
