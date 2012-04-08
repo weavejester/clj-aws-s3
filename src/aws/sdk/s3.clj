@@ -6,11 +6,17 @@
   (:import com.amazonaws.auth.BasicAWSCredentials
            com.amazonaws.services.s3.AmazonS3Client
            com.amazonaws.AmazonServiceException
+           com.amazonaws.services.s3.model.AccessControlList
            com.amazonaws.services.s3.model.Bucket
-           com.amazonaws.services.s3.model.Owner
+           com.amazonaws.services.s3.model.Grant
+           com.amazonaws.services.s3.model.CanonicalGrantee
+           com.amazonaws.services.s3.model.EmailAddressGrantee
+           com.amazonaws.services.s3.model.GroupGrantee
            com.amazonaws.services.s3.model.ListObjectsRequest
+           com.amazonaws.services.s3.model.Owner
            com.amazonaws.services.s3.model.ObjectMetadata
            com.amazonaws.services.s3.model.ObjectListing
+           com.amazonaws.services.s3.model.Permission
            com.amazonaws.services.s3.model.PutObjectRequest
            com.amazonaws.services.s3.model.S3Object
            com.amazonaws.services.s3.model.S3ObjectSummary
@@ -252,3 +258,53 @@
      (copy-object cred bucket src-key bucket dest-key))
   ([cred src-bucket src-key dest-bucket dest-key]
      (.copyObject (s3-client cred) src-bucket src-key dest-bucket dest-key)))
+
+(defprotocol ^{:nodoc true} ToClojure
+  "Convert an object into an idiomatic Clojure value."
+  (^{:nodoc true} to-clojure [x] "Turn the object into a Clojure value."))
+
+(extend-protocol ToClojure
+  CanonicalGrantee
+  (to-clojure [grantee]
+    {:id           (.getIdentifier grantee)
+     :display-name (.getDisplayName grantee)})
+  EmailAddressGrantee
+  (to-clojure [grantee]
+    {:email (.getIdentifier grantee)})
+  GroupGrantee
+  (to-clojure [grantee]
+    (condp = grantee
+      GroupGrantee/AllUsers           :all-users
+      GroupGrantee/AuthenticatedUsers :authenticated-users
+      GroupGrantee/LogDelivery        :log-delivery))
+  Permission
+  (to-clojure [permission]
+    (condp = permission
+      Permission/FullControl :full-control
+      Permission/Read        :read
+      Permission/ReadAcp     :read-acp
+      Permission/Write       :write
+      Permission/WriteAcp    :write-acp)))
+
+(extend-protocol Mappable
+  Grant
+  (to-map [grant]
+    {:grantee    (to-clojure (.getGrantee grant))
+     :permission (to-clojure (.getPermission grant))})
+  AccessControlList
+  (to-map [acl]
+    {:grants (set (map to-map (.getGrants acl)))
+     :owner  (to-map (.getOwner acl))}))
+
+(defn get-bucket-acl
+  "Get the access control list (ACL) for the supplied bucket. The ACL is a map
+  containing two keys:
+    :owner  - the owner of the ACL
+    :grants - a set of access permissions granted
+
+  The grants themselves are maps with keys:
+    :grantee    - the individual or group being granted access
+    :permission - the type of permission (:read, :write, :read-acp, :write-acp or
+                  :full-control)."
+  [cred bucket]
+  (to-map (.getBucketAcl (s3-client cred) bucket)))
