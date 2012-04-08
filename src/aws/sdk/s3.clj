@@ -308,3 +308,9 @@
                   :full-control)."
   [cred bucket]
   (to-map (.getBucketAcl (s3-client cred) bucket)))
+
+(defn get-object-acl
+  "Get the access control list (ACL) for the supplied object. See get-bucket-acl
+  for a detailed description of the return value."
+  [cred bucket key]
+  (to-map (.getObjectAcl (s3-client cred) bucket key)))
