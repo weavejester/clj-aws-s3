@@ -64,7 +64,11 @@
   (.deleteBucket (s3-client cred) name))
 
 (defn list-buckets
-  "List all the S3 buckets for the supplied credentials."
+  "List all the S3 buckets for the supplied credentials. The buckets will be
+  returned as a seq of maps with the following keys:
+    :name          - the bucket name
+    :creation-date - the date when the bucket was created
+    :owner         - the owner of the bucket"
   [cred]
   (map to-map (.listBuckets (s3-client cred))))
 
