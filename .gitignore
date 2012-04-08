@@ -4,4 +4,5 @@ pom.xml
 /classes/
 .lein-failures
 .lein-deps-sum
+.lein-env
 doc
