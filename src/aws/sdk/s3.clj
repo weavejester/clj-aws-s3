@@ -347,9 +347,17 @@
       (grantee (:grantee g))
       (permission (:permission g)))))
 
-(defn set-bucket-acl
-  [cred bucket {grants :grants}]
-  (let [acl (.getBucketAcl (s3-client cred) bucket)]
+(defn update-bucket-acl
+  [cred bucket & funcs]
+  (let [acl    (.getBucketAcl (s3-client cred) bucket)
+        grants (:grants (to-map acl))
+        update (apply comp (reverse funcs))]
     (clear-acl acl)
-    (add-acl-grants acl grants)
+    (add-acl-grants acl (update grants))
     (.setBucketAcl (s3-client cred) bucket acl)))
+
+(defn grant [grantee permission]
+  #(conj % {:grantee grantee :permission permission}))
+
+(defn revoke [grantee permission]
+  #(disj % {:grantee grantee :permission permission}))
