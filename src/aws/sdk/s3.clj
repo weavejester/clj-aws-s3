@@ -314,3 +314,42 @@
   for a detailed description of the return value."
   [cred bucket key]
   (to-map (.getObjectAcl (s3-client cred) bucket key)))
+
+(defn- permission [perm]
+  (case perm
+    :full-control Permission/FullControl
+    :read         Permission/Read
+    :read-acp     Permission/ReadAcp
+    :write        Permission/Write
+    :write-acp    Permission/WriteAcp))
+
+(defn- grantee [grantee]
+  (cond
+   (keyword? grantee)
+     (case grantee
+      :all-users           GroupGrantee/AllUsers
+      :authenticated-users GroupGrantee/AuthenticatedUsers
+      :log-delivery        GroupGrantee/LogDelivery)
+   (:id grantee)
+     (CanonicalGrantee. (:id grantee))
+   (:email grantee)
+     (EmailAddressGrantee. (:email grantee))))
+
+(defn- clear-acl [acl]
+  (doseq [grantee (->> (.getGrants acl)
+                       (map #(.getGrantee %))
+                       (set))]
+    (.revokeAllPermissions acl grantee)))
+
+(defn- add-acl-grants [acl grants]
+  (doseq [g grants]
+    (.grantPermission acl
+      (grantee (:grantee g))
+      (permission (:permission g)))))
+
+(defn set-bucket-acl
+  [cred bucket {grants :grants}]
+  (let [acl (.getBucketAcl (s3-client cred) bucket)]
+    (clear-acl acl)
+    (add-acl-grants acl grants)
+    (.setBucketAcl (s3-client cred) bucket acl)))
