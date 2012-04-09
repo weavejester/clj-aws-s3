@@ -259,9 +259,9 @@
   ([cred src-bucket src-key dest-bucket dest-key]
      (.copyObject (s3-client cred) src-bucket src-key dest-bucket dest-key)))
 
-(defprotocol ^{:nodoc true} ToClojure
+(defprotocol ^{:no-doc true} ToClojure
   "Convert an object into an idiomatic Clojure value."
-  (^{:nodoc true} to-clojure [x] "Turn the object into a Clojure value."))
+  (^{:no-doc true} to-clojure [x] "Turn the object into a Clojure value."))
 
 (extend-protocol ToClojure
   CanonicalGrantee
