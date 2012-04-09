@@ -348,6 +348,15 @@
       (permission (:permission g)))))
 
 (defn update-bucket-acl
+  "Update the access control list (ACL) for the named bucket using functions
+  that update a set of grants (see get-bucket-acl).
+
+  This function is often used with the grant and revoke functions, e.g.
+
+    (update-bucket-acl cred bucket
+      (grant :all-users :read)
+      (grant {:email \"foo@example.com\"} :full-control)
+      (revoke {:email \"bar@example.com\"} :write))"
   [cred bucket & funcs]
   (let [acl    (.getBucketAcl (s3-client cred) bucket)
         grants (:grants (to-map acl))
@@ -356,8 +365,14 @@
     (add-acl-grants acl (update grants))
     (.setBucketAcl (s3-client cred) bucket acl)))
 
-(defn grant [grantee permission]
+(defn grant
+  "Returns a function that adds a new grant map to a set of grants.
+  See update-bucket-acl."
+  [grantee permission]
   #(conj % {:grantee grantee :permission permission}))
 
-(defn revoke [grantee permission]
+(defn revoke
+  "Returns a function that removes a grant map from a set of grants.
+  See update-bucket-acl."
+  [grantee permission]
   #(disj % {:grantee grantee :permission permission}))
