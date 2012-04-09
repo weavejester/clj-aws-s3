@@ -7,10 +7,9 @@ Although there are a few S3 clients for Clojure around, this library
 aims to provide a more complete implementation, with metadata, streams
 and protocols for uploading different types of data.
 
-Currently the library supports functions to create and delete buckets,
-and to list, get, and put objects and their metadata.
-
-It doesn't support ACLs yet, but will do in a future release.
+Currently the library supports functions to create, list and delete
+buckets, to list, get, and put objects and their metadata, and to get
+and update the access control lists (ACLs) for buckets and objects.
 
 ## Install
 
@@ -28,6 +27,8 @@ Add the following dependency to your `project.clj` file:
 (s3/create-bucket cred "my-bucket")
 
 (s3/put-object cred "my-bucket" "some-key" "some-value")
+
+(s3/update-object-acl cred "my-bucket" "some-key" (s3/allow :all-users :read))
 
 (println (slurp (:content (s3/get-object cred "my-bucket" "some-key"))))
 ```
