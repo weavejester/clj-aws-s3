@@ -136,9 +136,19 @@
 (defn put-object
   "Put a value into an S3 bucket at the specified key. The value can be
   a String, InputStream or File (or anything that implements the ToPutRequest
-  protocol)."
-  [cred bucket key value]
-  (->> (put-request value)
+  protocol).
+
+  An optional map of metadata may also be supplied that can include any of the
+  following keys:
+    :cache-control          - the cache-control header (see RFC 2616)
+    :content-disposition    - how the content should be downloaded by browsers
+    :content-encoding       - the character encoding of the content
+    :content-length         - the length of the content in bytes
+    :content-md5            - the MD5 sum of the content
+    :content-type           - the mime type of the content
+    :server-side-encryption - set to AES256 if SSE is required"
+  [cred bucket key value & [metadata]]
+  (->> (merge (put-request value) metadata)
        (->PutObjectRequest bucket key)
        (.putObject (s3-client cred))))
 
