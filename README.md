@@ -15,7 +15,7 @@ and update the access control lists (ACLs) for buckets and objects.
 
 Add the following dependency to your `project.clj` file:
 
-    [clj-aws-s3 "0.3.0"]
+    [clj-aws-s3 "0.3.1"]
 
 ## Example
 
