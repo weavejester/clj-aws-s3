@@ -28,7 +28,7 @@ Add the following dependency to your `project.clj` file:
 
 (s3/put-object cred "my-bucket" "some-key" "some-value")
 
-(s3/update-object-acl cred "my-bucket" "some-key" (s3/allow :all-users :read))
+(s3/update-object-acl cred "my-bucket" "some-key" (s3/grant :all-users :read))
 
 (println (slurp (:content (s3/get-object cred "my-bucket" "some-key"))))
 ```
