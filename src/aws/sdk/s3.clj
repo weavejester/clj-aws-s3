@@ -126,7 +126,9 @@
   [bucket key request]
   (cond
    (:file request)
-     (PutObjectRequest. bucket key (:file request))
+     (let [put-obj-req (PutObjectRequest. bucket key (:file request))]
+       (.setMetadata put-obj-req (map->ObjectMetadata (dissoc request :file)))
+       put-obj-req)
    (:input-stream request)
      (PutObjectRequest.
       bucket key
