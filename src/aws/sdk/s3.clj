@@ -118,7 +118,7 @@
                       :content-length
                       :content-md5
                       :content-type
-                      :server-size-encryption))))
+                      :server-side-encryption))))
 
 (defn- ->PutObjectRequest
   "Create a PutObjectRequest instance from a bucket name, key and put request
