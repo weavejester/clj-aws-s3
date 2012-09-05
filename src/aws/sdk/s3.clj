@@ -135,6 +135,8 @@
       (:input-stream request)
       (map->ObjectMetadata (dissoc request :input-stream)))))
 
+(declare update-acl)
+
 (defn put-object
   "Put a value into an S3 bucket at the specified key. The value can be
   a String, InputStream or File (or anything that implements the ToPutRequest
@@ -148,11 +150,18 @@
     :content-length         - the length of the content in bytes
     :content-md5            - the MD5 sum of the content
     :content-type           - the mime type of the content
-    :server-side-encryption - set to AES256 if SSE is required"
-  [cred bucket key value & [metadata]]
-  (->> (merge (put-request value) metadata)
-       (->PutObjectRequest bucket key)
-       (.putObject (s3-client cred))))
+    :server-side-encryption - set to AES256 if SSE is required
+
+  An optional list of grant functions can be provided after metadata.
+  These functions will be applied to a clear ACL and the result will be
+  the ACL for the newly created object."
+  [cred bucket key value & [metadata & permissions]]
+  (let [req (->> (merge (put-request value) metadata)
+                 (->PutObjectRequest bucket key))
+        acl (when permissions (doto (AccessControlList.)
+                                (update-acl permissions)))]
+    (.setAccessControlList req acl)
+    (.putObject (s3-client cred) req)))
 
 (extend-protocol Mappable
   S3Object
