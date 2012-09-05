@@ -135,7 +135,7 @@
       (:input-stream request)
       (map->ObjectMetadata (dissoc request :input-stream)))))
 
-(declare update-acl)
+(declare create-acl) ; used by put-object
 
 (defn put-object
   "Put a value into an S3 bucket at the specified key. The value can be
@@ -157,10 +157,9 @@
   the ACL for the newly created object."
   [cred bucket key value & [metadata & permissions]]
   (let [req (->> (merge (put-request value) metadata)
-                 (->PutObjectRequest bucket key))
-        acl (when permissions (doto (AccessControlList.)
-                                (update-acl permissions)))]
-    (.setAccessControlList req acl)
+                 (->PutObjectRequest bucket key))]
+    (when permissions
+      (.setAccessControlList req (create-acl permissions)))
     (.putObject (s3-client cred) req)))
 
 (extend-protocol Mappable
@@ -373,6 +372,13 @@
         update (apply comp (reverse funcs))]
     (clear-acl acl)
     (add-acl-grants acl (update grants))))
+
+(defn create-acl
+  "Creates a fresh access control list (ACL) given a set of grants,
+   using the grant function. See update-bucket-acl for examples."
+  [permissions]
+  (doto (AccessControlList.)
+    (update-acl permissions)))
 
 (defn update-bucket-acl
   "Update the access control list (ACL) for the named bucket using functions
