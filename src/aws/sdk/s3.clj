@@ -10,6 +10,8 @@
            com.amazonaws.services.s3.model.Bucket
            com.amazonaws.services.s3.model.Grant
            com.amazonaws.services.s3.model.CanonicalGrantee
+           com.amazonaws.services.s3.model.DeleteObjectsRequest
+           com.amazonaws.services.s3.model.DeleteObjectsRequest$KeyVersion
            com.amazonaws.services.s3.model.EmailAddressGrantee
            com.amazonaws.services.s3.model.GroupGrantee
            com.amazonaws.services.s3.model.ListObjectsRequest
@@ -146,7 +148,7 @@
   following keys:
     :cache-control          - the cache-control header (see RFC 2616)
     :content-disposition    - how the content should be downloaded by browsers
-    :content-encoding       - the character encoding of the content
+    :content-encoding       - the character encbucketoding of the content
     :content-length         - the length of the content in bytes
     :content-md5            - the MD5 sum of the content
     :content-type           - the mime type of the content
@@ -260,6 +262,23 @@
   "Delete an object from an S3 bucket."
   [cred bucket key]
   (.deleteObject (s3-client cred) bucket key))
+
+(defn- map->DeleteObjectsRequest
+  "Create a DeleteObjectsRequest instance from a map of values."
+  [bucket request]
+  (doto (DeleteObjectsRequest. bucket)
+    (set-attr .setKeys       (map #(DeleteObjectsRequest$KeyVersion. %) (:keys request)))
+    (set-attr .setQuiet      (:quiet request))))
+
+(defn delete-objects
+  "Delete some objects from an S3 bucket. A map of options must be supplied.
+  Required:
+    :keys      - a list of keys as strings
+
+  Optionally:
+    :quiet     - the quiet element for this request"
+  [cred bucket options]
+  (.deleteObjects (s3-client cred) (map->DeleteObjectsRequest bucket options)))
 
 (defn object-exists?
   "Returns true if an object exists in the supplied bucket and key."
