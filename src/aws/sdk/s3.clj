@@ -95,7 +95,7 @@
   String
   (put-request [s]
     {:input-stream     (ByteArrayInputStream. (.getBytes s))
-     :content-length   (count s)
+     :content-length   (count (.getBytes s))
      :content-encoding (.name (Charset/defaultCharset))}))
 
 (defmacro set-attr
