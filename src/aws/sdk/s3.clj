@@ -6,6 +6,7 @@
   (:import com.amazonaws.auth.BasicAWSCredentials
            com.amazonaws.services.s3.AmazonS3Client
            com.amazonaws.AmazonServiceException
+           com.amazonaws.HttpMethod
            com.amazonaws.services.s3.model.AccessControlList
            com.amazonaws.services.s3.model.Bucket
            com.amazonaws.services.s3.model.Grant
@@ -198,6 +199,27 @@
                 :last-modified  (.getLastModified summary)}
      :bucket   (.getBucketName summary)
      :key      (.getKey summary)}))
+
+(defn generate-presigned-url
+  "Generate a pre-signed URL for accessing an S3 resource.
+  Return the URL as a string."
+  ([cred bucket key expiry-date]
+    (generate-presigned-url cred bucket key expiry-date "GET"))
+
+  ([cred bucket key expiry-date verb]
+    (let [method (cond (= verb "GET")    (HttpMethod/GET)
+                       (= verb "PUT")    (HttpMethod/PUT)
+                       (= verb "DELETE") (HttpMethod/DELETE)
+                       (= verb "HEAD")   (HttpMethod/HEAD)
+                       (= verb "POST")   (HttpMethod/POST)
+                       :else (throw (IllegalArgumentException.
+                                      (str "Unknown HTTP verb " verb))))]
+         (.toString (.generatePresignedUrl (s3-client cred)
+                                           bucket
+                                           key
+                                           expiry-date
+                                           method)))))
+
 
 (defn get-object
   "Get an object from an S3 bucket. The object is returned as a map with the
