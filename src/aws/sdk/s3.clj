@@ -3,9 +3,13 @@
 
   Each function takes a map of credentials as its first argument. The
   credentials map should contain an :access-key key and a :secret-key key."
+  (:require [clojure.string :as str]
+            [clj-time.core :as t]
+            [clj-time.coerce :as coerce])
   (:import com.amazonaws.auth.BasicAWSCredentials
            com.amazonaws.services.s3.AmazonS3Client
            com.amazonaws.AmazonServiceException
+           com.amazonaws.HttpMethod
            com.amazonaws.services.s3.model.AccessControlList
            com.amazonaws.services.s3.model.Bucket
            com.amazonaws.services.s3.model.Grant
@@ -233,6 +237,22 @@
     (set-attr .setMarker     (:marker request))
     (set-attr .setMaxKeys    (:max-keys request))
     (set-attr .setPrefix     (:prefix request))))
+
+(defn- http-method [method]
+  (-> method name str/upper-case HttpMethod/valueOf))
+
+(defn generate-presigned-url
+  "Return a presigned URL for an S3 object. Accepts the following options:
+    :expires     - the date at which the URL will expire (defaults to 1 day from now)
+    :http-method - the HTTP method for the URL (defaults to :get)"
+  [cred bucket key & [options]]
+  (.toString
+   (.generatePresignedUrl
+    (s3-client cred)
+    bucket
+    key
+    (coerce/to-date (:expires options (-> 1 t/days t/from-now)))
+    (http-method (:http-method options :get)))))
 
 (defn list-objects
   "List the objects in an S3 bucket. A optional map of options may be supplied.
