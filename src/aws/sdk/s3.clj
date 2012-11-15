@@ -89,9 +89,10 @@
   (put-request [f] {:file f})
   String
   (put-request [s]
-    {:input-stream     (ByteArrayInputStream. (.getBytes s))
-     :content-length   (count (.getBytes s))
-     :content-encoding (.name (Charset/defaultCharset))}))
+    (let [bytes (.getBytes s)]
+      {:input-stream     (ByteArrayInputStream. bytes)
+       :content-length   (count bytes)
+       :content-type     (str "text/plain; charset=" (.name (Charset/defaultCharset)))})))
 
 (defmacro set-attr
   "Set an attribute on an object if not nil."
@@ -146,7 +147,7 @@
   following keys:
     :cache-control          - the cache-control header (see RFC 2616)
     :content-disposition    - how the content should be downloaded by browsers
-    :content-encoding       - the character encoding of the content
+    :content-encoding       - the encoding of the content (e.g. gzip)
     :content-length         - the length of the content in bytes
     :content-md5            - the MD5 sum of the content
     :content-type           - the mime type of the content
