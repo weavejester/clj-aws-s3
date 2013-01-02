@@ -14,6 +14,7 @@
            com.amazonaws.services.s3.model.Bucket
            com.amazonaws.services.s3.model.Grant
            com.amazonaws.services.s3.model.CanonicalGrantee
+           com.amazonaws.services.s3.model.CopyObjectRequest
            com.amazonaws.services.s3.model.EmailAddressGrantee
            com.amazonaws.services.s3.model.GroupGrantee
            com.amazonaws.services.s3.model.ListObjectsRequest
@@ -299,6 +300,13 @@
      (copy-object cred bucket src-key bucket dest-key))
   ([cred src-bucket src-key dest-bucket dest-key]
      (.copyObject (s3-client cred) src-bucket src-key dest-bucket dest-key)))
+
+(defn update-object-metadata
+  "Change content type on an existing S3 object."
+  [cred bucket key metadata]
+  (.copyObject (s3-client cred)
+               (doto (CopyObjectRequest. bucket key bucket key)
+                 (.setNewObjectMetadata (map->ObjectMetadata metadata)))))
 
 (defprotocol ^{:no-doc true} ToClojure
   "Convert an object into an idiomatic Clojure value."
