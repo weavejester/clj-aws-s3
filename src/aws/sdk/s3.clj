@@ -241,6 +241,14 @@
 (defn- http-method [method]
   (-> method name str/upper-case HttpMethod/valueOf))
 
+(defn get-resource-url
+  "Return a URL suitable for serving static content directly from S3."
+  [cred bucket key]
+  (.getResourceUrl
+   (s3-client cred)
+   bucket
+   key))
+
 (defn generate-presigned-url
   "Return a presigned URL for an S3 object. Accepts the following options:
     :expires     - the date at which the URL will expire (defaults to 1 day from now)
