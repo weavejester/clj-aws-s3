@@ -5,7 +5,8 @@
   credentials map should contain an :access-key key and a :secret-key key."
   (:require [clojure.string :as str]
             [clj-time.core :as t]
-            [clj-time.coerce :as coerce])
+            [clj-time.coerce :as coerce]
+            [clojure.walk :as walk])
   (:import com.amazonaws.auth.BasicAWSCredentials
            com.amazonaws.services.s3.AmazonS3Client
            com.amazonaws.AmazonServiceException
@@ -117,13 +118,14 @@
     (set-attr .setContentType          (:content-type metadata))
     (set-attr .setServerSideEncryption (:server-side-encryption metadata))
     (set-attr .setUserMetadata
-     (dissoc metadata :cache-control
-                      :content-disposition
-                      :content-encoding
-                      :content-length
-                      :content-md5
-                      :content-type
-                      :server-side-encryption))))
+              (walk/stringify-keys (dissoc metadata
+                                           :cache-control
+                                           :content-disposition
+                                           :content-encoding
+                                           :content-length
+                                           :content-md5
+                                           :content-type
+                                           :server-side-encryption)))))
 
 (defn- ->PutObjectRequest
   "Create a PutObjectRequest instance from a bucket name, key and put request
@@ -184,7 +186,8 @@
      :content-type           (.getContentType metadata)
      :etag                   (.getETag metadata)
      :last-modified          (.getLastModified metadata)
-     :server-side-encryption (.getServerSideEncryption metadata)})
+     :server-side-encryption (.getServerSideEncryption metadata)
+     :user (walk/keywordize-keys (into {} (.getUserMetadata metadata)))})
   ObjectListing
   (to-map [listing]
     {:bucket          (.getBucketName listing)
