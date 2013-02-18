@@ -68,6 +68,11 @@
   [cred name]
   (to-map (.createBucket (s3-client cred) name)))
 
+(defn ensure-bucket
+  "Create a new S3 bucket if supplied bucket name does not exist."
+  [cred name]
+  (if-not (bucket-exists? cred name) (create-bucket cred name)))
+
 (defn delete-bucket
   "Delete the S3 bucket with the supplied name."
   [cred name]
