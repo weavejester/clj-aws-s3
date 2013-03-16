@@ -37,8 +37,8 @@ Add the following dependency to your `project.clj` file:
 
 ```clojure
 
-(s3/set-endpoint! creds "http://192.168.14.25:3333")
-(s3/list-buckets creds)
+(s3/set-endpoint! cred "http://192.168.14.25:3333")
+(s3/list-buckets cred)
 
 ```
 
