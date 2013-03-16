@@ -8,6 +8,7 @@
             [clj-time.coerce :as coerce]
             [clojure.walk :as walk])
   (:import com.amazonaws.auth.BasicAWSCredentials
+           com.amazonaws.ClientConfiguration
            com.amazonaws.services.s3.AmazonS3Client
            com.amazonaws.AmazonServiceException
            com.amazonaws.HttpMethod
@@ -32,15 +33,17 @@
 
 (defn- s3-client*
   "Create an AmazonS3Client instance from a map of credentials."
-  [cred]
-  (AmazonS3Client.
-   (BasicAWSCredentials.
-    (:access-key cred)
-    (:secret-key cred))))
-
+  [cred] 
+    (AmazonS3Client. (BasicAWSCredentials. (:access-key cred)
+                                           (:secret-key cred))))
 (def ^{:private true}
   s3-client
   (memoize s3-client*))
+
+(defn set-endpoint! [cred endpoint]
+  "Change default endpoint of S3Client."
+  (let [client (s3-client cred)]
+    (.setEndpoint client endpoint)))
 
 (defprotocol ^{:no-doc true} Mappable
   "Convert a value into a Clojure map."
