@@ -15,7 +15,7 @@ and update the access control lists (ACLs) for buckets and objects.
 
 Add the following dependency to your `project.clj` file:
 
-    [clj-aws-s3 "0.3.4"]
+    [clj-aws-s3 "0.3.3"]
 
 ## Example
 
@@ -31,15 +31,6 @@ Add the following dependency to your `project.clj` file:
 (s3/update-object-acl cred "my-bucket" "some-key" (s3/grant :all-users :read))
 
 (println (slurp (:content (s3/get-object cred "my-bucket" "some-key"))))
-```
-
-#### Using other S3-domain
-
-```clojure
-
-(s3/set-endpoint! cred "http://192.168.14.25:3333")
-(s3/list-buckets cred)
-
 ```
 
 ## Documentation
