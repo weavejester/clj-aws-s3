@@ -9,6 +9,7 @@
             [clojure.walk :as walk])
   (:import com.amazonaws.auth.BasicAWSCredentials
            com.amazonaws.services.s3.AmazonS3Client
+           com.amazonaws.services.s3.S3ClientOptions
            com.amazonaws.AmazonServiceException
            com.amazonaws.HttpMethod
            com.amazonaws.services.s3.model.AccessControlList
