@@ -34,8 +34,9 @@
 (defn- s3-client*
   "Create an AmazonS3Client instance from a map of credentials."
   [cred] 
-  (AmazonS3Client. (BasicAWSCredentials. (:access-key cred)
-                                         (:secret-key cred))))
+  (AmazonS3Client. 
+    (BasicAWSCredentials. (:access-key cred)
+                          (:secret-key cred))))
 
 (def ^{:private true}
   s3-client
