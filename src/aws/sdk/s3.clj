@@ -34,24 +34,27 @@
 (defn- s3-client*
   "Create an AmazonS3Client instance from a map of credentials."
   [cred] 
-    (AmazonS3Client. (BasicAWSCredentials. (:access-key cred)
-                                           (:secret-key cred))))
+  (AmazonS3Client. (BasicAWSCredentials. (:access-key cred)
+                                         (:secret-key cred))))
 
 (def ^{:private true}
   s3-client
   (memoize s3-client*))
 
-(defn set-endpoint! [cred endpoint]
+(defn set-endpoint! [cred]
   "Change default endpoint of S3Client."
   (let [client (s3-client cred)]
-    (.setEndpoint client endpoint)))
+      (println "Changing endpoint: " (:endpoint cred))
+      (.setEndpoint client (:endpoint cred))))
 
-(defn set-pathstyle! [cred value]
-  (let [client (s3-client cred)
+(defn set-pathstyle! [cred]
+  (let [value (:pathstyle cred)
+        client (s3-client cred)
         opt (S3ClientOptions. )]
     (.setPathStyleAccess opt value)
     (.setS3ClientOptions client opt)
     (.isPathStyleAccess opt)))
+
 
 (defprotocol ^{:no-doc true} Mappable
   "Convert a value into a Clojure map."
