@@ -30,13 +30,20 @@
            java.io.InputStream
            java.nio.charset.Charset))
 
+(defn- set-endpoint! [client endpoint]
+  "Change default endpoint of S3Client."
+  (println "Using endpoint: " endpoint)
+  (.setEndpoint client endpoint)
+  client)
+
 (defn- s3-client*
   "Create an AmazonS3Client instance from a map of credentials."
   [cred]
-  (AmazonS3Client.
-   (BasicAWSCredentials.
-    (:access-key cred)
-    (:secret-key cred))))
+  (let [credentials (BasicAWSCredentials. (:access-key cred) (:secret-key cred))
+        client (AmazonS3Client.  credentials)]
+    (when (contains? cred :endpoint)
+      (set-endpoint! client (:endpoint cred)))
+    client))
 
 (def ^{:private true}
   s3-client
