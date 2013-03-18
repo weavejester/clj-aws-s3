@@ -31,6 +31,12 @@ Add the following dependency to your `project.clj` file:
 (s3/update-object-acl cred "my-bucket" "some-key" (s3/grant :all-users :read))
 
 (println (slurp (:content (s3/get-object cred "my-bucket" "some-key"))))
+
+;; to use other S3 endpoint than AWS, add :endpoint key to cred
+
+(def cred2 {:access-key "..." :secret-key "..." :endpoint "http://127.0.0.1:4567"})
+(s3/list-buckets cred2)
+
 ```
 
 ## Documentation
