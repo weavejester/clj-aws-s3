@@ -419,10 +419,7 @@
     (clear-acl acl)
     (add-acl-grants acl (update grants))))
 
-(defn create-acl
-  "Creates a fresh access control list (ACL) given a set of grants,
-   using the grant function. See update-bucket-acl for examples."
-  [permissions]
+(defn- create-acl [permissions]
   (doto (AccessControlList.)
     (update-acl permissions)))
 
