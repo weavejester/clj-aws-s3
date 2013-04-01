@@ -34,7 +34,7 @@
 (defn- s3-client*
   "Create an AmazonS3Client instance from a map of credentials."
   [{:keys [access-key secret-key session-token]}]
-  (-> (if (session-token)
+  (-> (if session-token
         (BasicSessionCredentials. access-key secret-key session-token)
         (BasicAWSCredentials. access-key secret-key))
       (AmazonS3Client.)))
