@@ -8,6 +8,7 @@
             [clj-time.coerce :as coerce]
             [clojure.walk :as walk])
   (:import com.amazonaws.auth.BasicAWSCredentials
+           com.amazonaws.auth.BasicSessionCredentials
            com.amazonaws.services.s3.AmazonS3Client
            com.amazonaws.AmazonServiceException
            com.amazonaws.HttpMethod
@@ -32,11 +33,11 @@
 
 (defn- s3-client*
   "Create an AmazonS3Client instance from a map of credentials."
-  [cred]
-  (AmazonS3Client.
-   (BasicAWSCredentials.
-    (:access-key cred)
-    (:secret-key cred))))
+  [{:keys [access-key secret-key session-token]}]
+  (-> (if (session-token)
+        (BasicSessionCredentials. access-key secret-key session-token)
+        (BasicAWSCredentials. access-key secret-key))
+      (AmazonS3Client.)))
 
 (def ^{:private true}
   s3-client
