@@ -111,6 +111,9 @@
   `(if-let [v# ~value]
      (~setter ~object v#)))
 
+(defn- maybe-int [x]
+  (if x (int x)))
+
 (defn- map->ObjectMetadata
   "Convert a map of object metadata into a ObjectMetadata instance."
   [metadata]
@@ -243,7 +246,7 @@
     (set-attr .setBucketName (:bucket request))
     (set-attr .setDelimiter  (:delimiter request))
     (set-attr .setMarker     (:marker request))
-    (set-attr .setMaxKeys    (:max-keys request))
+    (set-attr .setMaxKeys    (maybe-int (:max-keys request)))
     (set-attr .setPrefix     (:prefix request))))
 
 (defn- http-method [method]
