@@ -16,6 +16,7 @@
            com.amazonaws.services.s3.model.Grant
            com.amazonaws.services.s3.model.CanonicalGrantee
            com.amazonaws.services.s3.model.EmailAddressGrantee
+           com.amazonaws.services.s3.model.GetObjectMetadataRequest
            com.amazonaws.services.s3.model.GroupGrantee
            com.amazonaws.services.s3.model.ListObjectsRequest
            com.amazonaws.services.s3.model.ListVersionsRequest
@@ -193,7 +194,8 @@
      :etag                   (.getETag metadata)
      :last-modified          (.getLastModified metadata)
      :server-side-encryption (.getServerSideEncryption metadata)
-     :user (walk/keywordize-keys (into {} (.getUserMetadata metadata)))})
+     :user (walk/keywordize-keys (into {} (.getUserMetadata metadata)))
+     :version-id             (.getVersionId metadata)})
   ObjectListing
   (to-map [listing]
     {:bucket          (.getBucketName listing)
@@ -245,20 +247,31 @@
   [cred bucket key]
   (to-map (.getObject (s3-client cred) bucket key)))
 
+(defn- map->GetObjectMetadataRequest
+  "Create a ListObjectsRequest instance from a map of values."
+  [request]
+  (GetObjectMetadataRequest. (:bucket request) (:key request) (:version-id request)))
+
 (defn get-object-metadata
-  "Get an object's metadata from a bucket. The metadata is a map with the
-  following keys:
-    :cache-control          - the CacheControl HTTP header
-    :content-disposition    - the ContentDisposition HTTP header
-    :content-encoding       - the character encoding of the content
-    :content-length         - the length of the content in bytes
-    :content-md5            - the MD5 hash of the content
-    :content-type           - the mime-type of the content
-    :etag                   - the HTTP ETag header
-    :last-modified          - the last modified date
-    :server-side-encryption - the server-side encryption algorithm"
-  [cred bucket key]
-  (to-map (.getObjectMetadata (s3-client cred) bucket key)))
+  "Get an object's metadata from a bucket.  A optional map of options may be supplied.
+   Available options are:
+     :version-id - the version of the object
+   The metadata is a map with the
+   following keys:
+     :cache-control          - the CacheControl HTTP header
+     :content-disposition    - the ContentDisposition HTTP header
+     :content-encoding       - the character encoding of the content
+     :content-length         - the length of the content in bytes
+     :content-md5            - the MD5 hash of the content
+     :content-type           - the mime-type of the content
+     :etag                   - the HTTP ETag header
+     :last-modified          - the last modified date
+     :server-side-encryption - the server-side encryption algorithm"
+  [cred bucket key & [options]]
+  (to-map
+   (.getObjectMetadata
+    (s3-client cred)
+    (map->GetObjectMetadataRequest (merge {:bucket bucket :key key} options)))))
 
 (defn- map->ListObjectsRequest
   "Create a ListObjectsRequest instance from a map of values."
