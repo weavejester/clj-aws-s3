@@ -234,7 +234,7 @@
      :common-prefixes        (seq (.getCommonPrefixes listing))
      :delimiter              (.getDelimiter listing)
      :truncated?             (.isTruncated listing)
-     :max-results            (.getMaxKeys listing) ; AWS API is inconsistent, should be .getMaxResults
+     :max-results            (maybe-int (.getMaxKeys listing)) ; AWS API is inconsistent, should be .getMaxResults
      :key-marker             (.getKeyMarker listing)
      :next-key-marker        (.getNextKeyMarker listing)
      :next-version-id-marker (.getNextVersionIdMarker listing)
