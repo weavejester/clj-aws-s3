@@ -373,6 +373,11 @@
     (s3-client cred)
     (map->ListVersionsRequest (merge {:bucket bucket} options)))))
 
+(defn delete-version
+  "Deletes a specific version of the specified object in the specified bucket."
+  [cred bucket key version-id]
+  (.deleteVersion (s3-client cred) bucket key version-id))
+
 (defprotocol ^{:no-doc true} ToClojure
   "Convert an object into an idiomatic Clojure value."
   (^{:no-doc true} to-clojure [x] "Turn the object into a Clojure value."))
