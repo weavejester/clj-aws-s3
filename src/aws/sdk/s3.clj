@@ -18,6 +18,7 @@
            com.amazonaws.services.s3.model.EmailAddressGrantee
            com.amazonaws.services.s3.model.GroupGrantee
            com.amazonaws.services.s3.model.ListObjectsRequest
+           com.amazonaws.services.s3.model.ListVersionsRequest
            com.amazonaws.services.s3.model.Owner
            com.amazonaws.services.s3.model.ObjectMetadata
            com.amazonaws.services.s3.model.ObjectListing
@@ -25,6 +26,8 @@
            com.amazonaws.services.s3.model.PutObjectRequest
            com.amazonaws.services.s3.model.S3Object
            com.amazonaws.services.s3.model.S3ObjectSummary
+           com.amazonaws.services.s3.model.S3VersionSummary
+           com.amazonaws.services.s3.model.VersionListing
            java.io.ByteArrayInputStream
            java.io.File
            java.io.InputStream
@@ -207,7 +210,30 @@
                 :etag           (.getETag summary)
                 :last-modified  (.getLastModified summary)}
      :bucket   (.getBucketName summary)
-     :key      (.getKey summary)}))
+     :key      (.getKey summary)})
+  S3VersionSummary
+  (to-map [summary]
+    {:metadata {:content-length (.getSize summary)
+                :etag           (.getETag summary)
+                :last-modified  (.getLastModified summary)}
+     :version-id     (.getVersionId summary)
+     :latest?        (.isLatest summary)
+     :delete-marker? (.isDeleteMarker summary)
+     :bucket         (.getBucketName summary)
+     :key            (.getKey summary)})
+  VersionListing
+  (to-map [listing]
+    {:bucket                 (.getBucketName listing)
+     :versions               (map to-map (.getVersionSummaries listing))
+     :prefix                 (.getPrefix listing)
+     :common-prefixes        (seq (.getCommonPrefixes listing))
+     :delimiter              (.getDelimiter listing)
+     :truncated?             (.isTruncated listing)
+     :max-results            (.getMaxKeys listing) ; AWS API is inconsistent, should be .getMaxResults
+     :key-marker             (.getKeyMarker listing)
+     :next-key-marker        (.getNextKeyMarker listing)
+     :next-version-id-marker (.getNextVersionIdMarker listing)
+     :version-id-marker      (.getVersionIdMarker listing)}))
 
 (defn get-object
   "Get an object from an S3 bucket. The object is returned as a map with the
@@ -305,6 +331,47 @@
      (copy-object cred bucket src-key bucket dest-key))
   ([cred src-bucket src-key dest-bucket dest-key]
      (.copyObject (s3-client cred) src-bucket src-key dest-bucket dest-key)))
+
+(defn- map->ListVersionsRequest
+  "Create a ListVersionsRequest instance from a map of values."
+  [request]
+  (doto (ListVersionsRequest.)
+    (set-attr .setBucketName      (:bucket request))
+    (set-attr .setDelimiter       (:delimiter request))
+    (set-attr .setKeyMarker       (:key-marker request))
+    (set-attr .setMaxResults      (:max-results request))
+    (set-attr .setPrefix          (:prefix request))
+    (set-attr .setVersionIdMarker (:version-id-marker request))))
+
+(defn list-versions
+ "List the versions in an S3 bucket. A optional map of options may be supplied.
+  Available options are:
+    :delimiter   - the delimiter used in prefix (such as a '/')
+    :key-marker  - read versions from the sorted list of all versions starting
+                   at this marker.
+    :max-results - read only this many versions
+    :prefix      - read only versions with keys having this prefix
+
+  The version listing will be returned as a map containing the following versions:
+    :bucket                 - the name of the bucket
+    :prefix                 - the supplied prefix (or nil if none supplied)
+    :versions               - a sorted list of versions, newest first, each
+                              version has:
+                              :version-id     - the unique version id
+                              :latest?        - is this the latest version for that key?
+                              :delete-marker? - is this a delete-marker?
+    :common-prefixes        - the common prefixes of keys omitted by the delimiter
+    :max-results            - the maximum number of results to be returned
+    :truncated?             - true if the results were truncated
+    :key-marker             - the key marker of the listing
+    :next-version-id-marker - the version ID marker to use in the next listVersions
+                              request in order to obtain the next page of results.
+    :version-id-marker      - the version id marker of the listing"
+ [cred bucket & [options]]
+ (to-map
+   (.listVersions
+    (s3-client cred)
+    (map->ListVersionsRequest (merge {:bucket bucket} options)))))
 
 (defprotocol ^{:no-doc true} ToClojure
   "Convert an object into an idiomatic Clojure value."
