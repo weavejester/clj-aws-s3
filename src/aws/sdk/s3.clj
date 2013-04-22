@@ -2,7 +2,8 @@
   "Functions to access the Amazon S3 storage service.
 
   Each function takes a map of credentials as its first argument. The
-  credentials map should contain an :access-key key and a :secret-key key."
+  credentials map should contain an :access-key key and a :secret-key key,
+  and optionally an :endpoint key to denote an AWS endpoint."
   (:require [clojure.string :as str]
             [clj-time.core :as t]
             [clj-time.coerce :as coerce]
@@ -37,10 +38,11 @@
 (defn- s3-client*
   "Create an AmazonS3Client instance from a map of credentials."
   [cred]
-  (AmazonS3Client.
-   (BasicAWSCredentials.
-    (:access-key cred)
-    (:secret-key cred))))
+  (let [aws-creds (BasicAWSCredentials. (:access-key cred) (:secret-key cred))
+        client    (AmazonS3Client. aws-creds)]
+    (when-let [endpoint (:endpoint cred)]
+      (.setEndpoint client endpoint))
+    client))
 
 (def ^{:private true}
   s3-client
