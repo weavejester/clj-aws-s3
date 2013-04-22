@@ -39,6 +39,6 @@ Add the following dependency to your `project.clj` file:
 
 ## License
 
-Copyright (C) 2012 James Reeves
+Copyright © 2013 James Reeves
 
 Distributed under the Eclipse Public License, the same as Clojure.
