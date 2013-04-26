@@ -8,7 +8,9 @@
             [clj-time.core :as t]
             [clj-time.coerce :as coerce]
             [clojure.walk :as walk])
-  (:import com.amazonaws.auth.BasicAWSCredentials
+  (:import com.amazonaws.auth.AWSCredentials
+           com.amazonaws.auth.BasicAWSCredentials
+           com.amazonaws.auth.BasicSessionCredentials
            com.amazonaws.services.s3.AmazonS3Client
            com.amazonaws.AmazonServiceException
            com.amazonaws.HttpMethod
@@ -35,11 +37,17 @@
            java.io.InputStream
            java.nio.charset.Charset))
 
+(defn- ^AWSCredentials aws-creds
+  "Create an AWSCredentials implementation from a map of credentials."
+  [{:keys [access-key secret-key session-token]}]
+  (if session-token
+    (BasicSessionCredentials. access-key secret-key session-token)
+    (BasicAWSCredentials. access-key secret-key)))
+
 (defn- s3-client*
   "Create an AmazonS3Client instance from a map of credentials."
   [cred]
-  (let [aws-creds (BasicAWSCredentials. (:access-key cred) (:secret-key cred))
-        client    (AmazonS3Client. aws-creds)]
+  (let [client (AmazonS3Client. (aws-creds cred))]
     (when-let [endpoint (:endpoint cred)]
       (.setEndpoint client endpoint))
     client))
