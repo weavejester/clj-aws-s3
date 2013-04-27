@@ -4,15 +4,12 @@
   Each function takes a map of credentials as its first argument. The
   credentials map should contain an :access-key key and a :secret-key key,
   and optionally an :endpoint key to denote an AWS endpoint."
+  (:use [aws.sdk.s3.client :only (s3-client)])
   (:require [clojure.string :as str]
             [clj-time.core :as t]
             [clj-time.coerce :as coerce]
             [clojure.walk :as walk])
-  (:import com.amazonaws.auth.AWSCredentials
-           com.amazonaws.auth.BasicAWSCredentials
-           com.amazonaws.auth.BasicSessionCredentials
-           com.amazonaws.services.s3.AmazonS3Client
-           com.amazonaws.AmazonServiceException
+  (:import com.amazonaws.AmazonServiceException
            com.amazonaws.HttpMethod
            com.amazonaws.services.s3.model.AccessControlList
            com.amazonaws.services.s3.model.Bucket
@@ -36,25 +33,6 @@
            java.io.File
            java.io.InputStream
            java.nio.charset.Charset))
-
-(defn- ^AWSCredentials aws-creds
-  "Create an AWSCredentials implementation from a map of credentials."
-  [{:keys [access-key secret-key session-token]}]
-  (if session-token
-    (BasicSessionCredentials. access-key secret-key session-token)
-    (BasicAWSCredentials. access-key secret-key)))
-
-(defn- s3-client*
-  "Create an AmazonS3Client instance from a map of credentials."
-  [cred]
-  (let [client (AmazonS3Client. (aws-creds cred))]
-    (when-let [endpoint (:endpoint cred)]
-      (.setEndpoint client endpoint))
-    client))
-
-(def ^{:private true}
-  s3-client
-  (memoize s3-client*))
 
 (defprotocol ^{:no-doc true} Mappable
   "Convert a value into a Clojure map."
