@@ -4,7 +4,8 @@
   Each function takes a map of credentials as its first argument. The
   credentials map should contain an :access-key key and a :secret-key key,
   and optionally an :endpoint key to denote an AWS endpoint."
-  (:require [clojure.string :as str]
+  (:require [clojure.set :as set]
+            [clojure.string :as str]
             [clj-time.core :as t]
             [clj-time.coerce :as coerce]
             [clojure.walk :as walk])
@@ -324,6 +325,58 @@
     (s3-client cred)
     (map->ListObjectsRequest (merge {:bucket bucket} options)))))
 
+(defn paged-results-seq
+  "Wrap an AWS call that returns paged results, converting the
+   paged result list into a lazy sequence that will retrieve the
+   next page only when necessary.
+
+   The options map MUST contain:
+        src-fn     - a function that returns an AWS paged result
+        result-key - the key under which the desired data is stored
+                     (typically the response contains meta data about the
+                     request)
+        marker-map - a map of the form
+                         {:next-key1 :key1
+                          :next-key2 :key2}
+                     which details which response keys identify paging
+                     parameters and which key they should be passed in the
+                     _next page_ request
+  any remaining options are passed to src-fn AWS call."
+  [cred bucket options]
+  (let [{:keys [src-fn
+                results-key
+                marker-map]} options
+        resp                 (src-fn cred bucket options)]
+    (if (:truncated? resp)
+      (assoc resp
+        results-key
+        (lazy-cat (get resp results-key)
+                  (get (paged-results-seq
+                        cred bucket
+                        (merge options
+                               (set/rename-keys
+                                (select-keys resp (keys marker-map))
+                                marker-map)))
+                       results-key)))
+      resp)))
+
+(defn list-objects-seq
+  "Make a call to list-objects and return `:objects` from the result
+   as a lazy seq, making _next page_ calls as appropriate. `options`
+   are passed to the underlying `list-objects` call
+   e.g.
+       `(list-objects-seq cred bucket {:max-keys 100 :prefix \"foo\"})`
+  returns a sequence of all objects with key matching the prefix \"foo\"
+  with page size of 100."
+  [cred bucket & [options]]
+  (:objects
+   (paged-results-seq cred
+                      bucket
+                      (merge options
+                             {:src-fn      list-objects
+                              :results-key :objects
+                              :marker-map  {:next-marker :marker}}))))
+
 (defn delete-object
   "Delete an object from an S3 bucket."
   [cred bucket key]
@@ -387,6 +440,24 @@
    (.listVersions
     (s3-client cred)
     (map->ListVersionsRequest (merge {:bucket bucket} options)))))
+
+(defn list-versions-seq
+  "Make a call to list-versions and return `:versions` from the result
+   as a lazy seq, making _next page_ calls as appropriate. `options`
+   are passed to the underlying `list-objects` call
+   e.g.
+       `(list-versions-seq cred bucket {:max-results 100 :prefix \"foo\"})`
+  returns a sequence of all versions with key matching the prefix \"foo\"
+  with page size of 100."
+  [cred bucket & [options]]
+  (:versions
+   (paged-results-seq cred
+                      bucket
+                      (merge options
+                             {:src-fn      list-versions
+                              :results-key :versions
+                              :marker-map  {:next-key-marker        :key-marker
+                                            :next-version-id-marker :version-id-marker}}))))
 
 (defn delete-version
   "Deletes a specific version of the specified object in the specified bucket."
