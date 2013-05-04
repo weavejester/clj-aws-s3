@@ -11,6 +11,7 @@
   (:import com.amazonaws.auth.BasicAWSCredentials
            com.amazonaws.services.s3.AmazonS3Client
            com.amazonaws.AmazonServiceException
+           com.amazonaws.ClientConfiguration
            com.amazonaws.HttpMethod
            com.amazonaws.services.s3.model.AccessControlList
            com.amazonaws.services.s3.model.Bucket
@@ -38,13 +39,23 @@
            java.nio.charset.Charset))
 
 (defn- s3-client*
-  "Create an AmazonS3Client instance from a map of credentials."
+  "Create an AmazonS3Client instance from a map of credentials.
+
+Map may also contain the configuration keys :conn-timeout,
+:socket-timeout, and :max-retries."
   [cred]
-  (let [aws-creds (BasicAWSCredentials. (:access-key cred) (:secret-key cred))
-        client    (AmazonS3Client. aws-creds)]
-    (when-let [endpoint (:endpoint cred)]
-      (.setEndpoint client endpoint))
-    client))
+  (let [client-configuration (ClientConfiguration.)]
+    (when-let [conn-timeout (:conn-timeout cred)]
+      (.setConnectionTimeout client-configuration conn-timeout))
+    (when-let [socket-timeout (:socket-timeout cred)]
+      (.setSocketTimeout client-configuration socket-timeout))
+    (when-let [max-retries (:max-retries cred)]
+      (.setMaxErrorRetry client-configuration max-retries))
+    (let [aws-creds (BasicAWSCredentials. (:access-key cred) (:secret-key cred))
+          client    (AmazonS3Client. aws-creds client-configuration)]
+      (when-let [endpoint (:endpoint cred)]
+        (.setEndpoint client endpoint))
+      client)))
 
 (def ^{:private true}
   s3-client
