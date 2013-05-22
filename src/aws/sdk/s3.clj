@@ -19,6 +19,7 @@
            com.amazonaws.services.s3.model.CanonicalGrantee
            com.amazonaws.services.s3.model.DeleteObjectsRequest
            com.amazonaws.services.s3.model.DeleteObjectsRequest$KeyVersion
+           com.amazonaws.services.s3.model.CopyObjectResult
            com.amazonaws.services.s3.model.EmailAddressGrantee
            com.amazonaws.services.s3.model.GetObjectMetadataRequest
            com.amazonaws.services.s3.model.GroupGrantee
@@ -250,7 +251,14 @@ Map may also contain the configuration keys :conn-timeout,
      :key-marker             (.getKeyMarker listing)
      :next-key-marker        (.getNextKeyMarker listing)
      :next-version-id-marker (.getNextVersionIdMarker listing)
-     :version-id-marker      (.getVersionIdMarker listing)}))
+     :version-id-marker      (.getVersionIdMarker listing)})
+  CopyObjectResult
+  (to-map [result]
+    {:etag                    (.getETag result)
+     :expiration-time         (.getExpirationTime result)
+     :expiration-time-rule-id (.getExpirationTimeRuleId result)
+     :last-modified-date      (.getLastModifiedDate result)
+     :server-side-encryption  (.getServerSideEncryption result)}))
 
 (defn get-object
   "Get an object from an S3 bucket. The object is returned as a map with the
@@ -371,11 +379,12 @@ Map may also contain the configuration keys :conn-timeout,
         (throw e)))))
 
 (defn copy-object
-  "Copy an existing S3 object to another key."
+  "Copy an existing S3 object to another key. Returns a map containing
+   the data returned from S3"
   ([cred bucket src-key dest-key]
      (copy-object cred bucket src-key bucket dest-key))
   ([cred src-bucket src-key dest-bucket dest-key]
-     (.copyObject (s3-client cred) src-bucket src-key dest-bucket dest-key)))
+     (to-map (.copyObject (s3-client cred) src-bucket src-key dest-bucket dest-key))))
 
 (defn- map->ListVersionsRequest
   "Create a ListVersionsRequest instance from a map of values."
