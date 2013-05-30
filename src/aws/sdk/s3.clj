@@ -261,10 +261,14 @@ Map may also contain the configuration keys :conn-timeout,
 (defn get-object
   "Get an object from an S3 bucket. The object is returned as a map with the
   following keys:
-    :content  - an InputStream to the content
+    :content  - an InputStream to the content. (*)
     :metadata - a map of the object's metadata
     :bucket   - the name of the bucket
-    :key      - the object's key"
+    :key      - the object's key
+    
+    (*) WARNING: the underlying HTTP connection remains open until this stream is 
+        closed, which can cause an AmazonClientException due to a timeout waiting for a connection.
+        See AWS docs for AmazonS3Client/getObject."
   [cred bucket key]
   (to-map (.getObject (s3-client cred) bucket key)))
 
