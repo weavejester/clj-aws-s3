@@ -34,6 +34,11 @@
            com.amazonaws.services.s3.model.S3ObjectSummary
            com.amazonaws.services.s3.model.S3VersionSummary
            com.amazonaws.services.s3.model.VersionListing
+           com.amazonaws.services.s3.model.InitiateMultipartUploadRequest
+           com.amazonaws.services.s3.model.AbortMultipartUploadRequest
+           com.amazonaws.services.s3.model.CompleteMultipartUploadRequest
+           com.amazonaws.services.s3.model.UploadPartRequest
+           java.util.concurrent.Executors
            java.io.ByteArrayInputStream
            java.io.File
            java.io.InputStream
@@ -191,6 +196,65 @@ Map may also contain the configuration keys :conn-timeout,
     (when permissions
       (.setAccessControlList req (create-acl permissions)))
     (.putObject (s3-client cred) req)))
+
+(defn- initiate-multipart-upload
+  [cred bucket key] 
+  (.getUploadId (.initiateMultipartUpload 
+                  (s3-client cred) 
+                  (InitiateMultipartUploadRequest. bucket key))))
+
+(defn- abort-multipart-upload
+  [{cred :cred bucket :bucket key :key upload-id :upload-id}] 
+  (.abortMultipartUpload 
+    (s3-client cred) 
+    (AbortMultipartUploadRequest. bucket key upload-id)))
+
+(defn- complete-multipart-upload
+  [{cred :cred bucket :bucket key :key upload-id :upload-id e-tags :e-tags}] 
+  (.completeMultipartUpload
+    (s3-client cred)
+    (CompleteMultipartUploadRequest. bucket key upload-id e-tags)))
+
+(defn- upload-part
+  [{cred :cred bucket :bucket key :key upload-id :upload-id
+    part-size :part-size offset :offset file :file}] 
+  (.getPartETag (.uploadPart (s3-client cred) 
+                             (doto (UploadPartRequest.) 
+                               (.setBucketName bucket) 
+                               (.setKey key) 
+                               (.setUploadId upload-id) 
+                               (.setPartNumber (+ 1 (/ offset part-size))) 
+                               (.setFileOffset offset) 
+                               (.setPartSize (min part-size (- (.length file) offset)))
+                               (.setFile file)))))
+
+(defn put-multipart-object
+  "Do a multipart upload of a file into a S3 bucket at the specified key.
+  The value must be a java.io.File object.  The entire file is uploaded 
+  or not at all.  If an exception happens at any time the upload is aborted 
+  and the exception is rethrown. The size of the parts and the number of
+  threads uploading the parts can be configured in the last argument as a
+  map with the following keys:
+    :part-size - the size in bytes of each part of the file.  Must be 5mb
+                 or larger.  Defaults to 5mb
+    :threads   - the number of threads that will upload parts concurrently.
+                 Defaults to 16."
+  [cred bucket key file & [{:keys [part-size threads]
+                            :or {part-size (* 5 1024 1024) threads 16}}]]
+  (let [upload-id (initiate-multipart-upload cred bucket key)
+        upload {:upload-id upload-id :cred cred :bucket bucket :key key :file file}
+        pool (Executors/newFixedThreadPool threads)
+        offsets (range 0 (.length file) part-size)
+        tasks (map #(fn [] (upload-part (assoc upload :offset % 
+                                               :part-size part-size))) offsets)]
+    (try
+      (complete-multipart-upload
+        (assoc upload :e-tags (map #(.get %) (.invokeAll pool tasks))))
+      (catch Exception ex 
+        (abort-multipart-upload upload) 
+        (.shutdown pool)
+        (throw ex))
+      (finally (.shutdown pool)))))
 
 (extend-protocol Mappable
   S3Object
