@@ -218,15 +218,17 @@ Map may also contain the configuration keys :conn-timeout,
 (defn- upload-part
   [{cred :cred bucket :bucket key :key upload-id :upload-id
     part-size :part-size offset :offset file :file}] 
-  (.getPartETag (.uploadPart (s3-client cred) 
-                             (doto (UploadPartRequest.) 
-                               (.setBucketName bucket) 
-                               (.setKey key) 
-                               (.setUploadId upload-id) 
-                               (.setPartNumber (+ 1 (/ offset part-size))) 
-                               (.setFileOffset offset) 
-                               (.setPartSize (min part-size (- (.length file) offset)))
-                               (.setFile file)))))
+  (.getPartETag
+   (.uploadPart
+    (s3-client cred)
+    (doto (UploadPartRequest.)
+      (.setBucketName bucket)
+      (.setKey key)
+      (.setUploadId upload-id)
+      (.setPartNumber (+ 1 (/ offset part-size)))
+      (.setFileOffset offset)
+      (.setPartSize (min part-size (- (.length file) offset)))
+      (.setFile file)))))
 
 (defn put-multipart-object
   "Do a multipart upload of a file into a S3 bucket at the specified key.
@@ -242,11 +244,11 @@ Map may also contain the configuration keys :conn-timeout,
   [cred bucket key file & [{:keys [part-size threads]
                             :or {part-size (* 5 1024 1024) threads 16}}]]
   (let [upload-id (initiate-multipart-upload cred bucket key)
-        upload {:upload-id upload-id :cred cred :bucket bucket :key key :file file}
-        pool (Executors/newFixedThreadPool threads)
-        offsets (range 0 (.length file) part-size)
-        tasks (map #(fn [] (upload-part (assoc upload :offset % 
-                                               :part-size part-size))) offsets)]
+        upload    {:upload-id upload-id :cred cred :bucket bucket :key key :file file}
+        pool      (Executors/newFixedThreadPool threads)
+        offsets   (range 0 (.length file) part-size)
+        tasks     (map #(fn [] (upload-part (assoc upload :offset % :part-size part-size)))
+                       offsets)]
     (try
       (complete-multipart-upload
         (assoc upload :e-tags (map #(.get %) (.invokeAll pool tasks))))
