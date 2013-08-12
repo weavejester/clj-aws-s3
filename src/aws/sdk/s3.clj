@@ -449,11 +449,12 @@ Map may also contain the configuration keys :conn-timeout,
 (defn list-versions
  "List the versions in an S3 bucket. A optional map of options may be supplied.
   Available options are:
-    :delimiter   - the delimiter used in prefix (such as a '/')
-    :key-marker  - read versions from the sorted list of all versions starting
-                   at this marker.
-    :max-results - read only this many versions
-    :prefix      - read only versions with keys having this prefix
+    :delimiter         - the delimiter used in prefix (such as a '/')
+    :key-marker        - read versions from the sorted list of all versions starting
+                         at this marker.
+    :max-results       - read only this many versions
+    :prefix            - read only versions with keys having this prefix
+    :version-id-marker - read objects after this version id
 
   The version listing will be returned as a map containing the following versions:
     :bucket                 - the name of the bucket
