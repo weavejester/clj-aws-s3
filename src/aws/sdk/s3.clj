@@ -442,7 +442,7 @@ Map may also contain the configuration keys :conn-timeout,
     (set-attr .setBucketName      (:bucket request))
     (set-attr .setDelimiter       (:delimiter request))
     (set-attr .setKeyMarker       (:key-marker request))
-    (set-attr .setMaxResults      (:max-results request))
+    (set-attr .setMaxResults      (maybe-int (:max-results request)))
     (set-attr .setPrefix          (:prefix request))
     (set-attr .setVersionIdMarker (:version-id-marker request))))
 
