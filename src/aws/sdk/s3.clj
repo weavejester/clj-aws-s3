@@ -42,7 +42,7 @@
            java.io.InputStream
            java.nio.charset.Charset))
 
-(defn- s3-client* 
+(defn- s3-client*
   "Create an AmazonS3Client instance from a map of credentials.
 
 Map may also contain the configuration keys :conn-timeout,
