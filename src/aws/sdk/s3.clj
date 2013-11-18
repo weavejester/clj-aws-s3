@@ -33,7 +33,10 @@
   (AmazonS3Client.
    (BasicAWSCredentials.
     (:access-key cred)
-    (:secret-key cred))))
+    (:secret-key cred))
+    (ClientConfiguration.
+      (setProxyHost "localhost"))
+    ))
 
 (def ^{:private true}
   s3-client
