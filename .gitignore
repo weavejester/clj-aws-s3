@@ -1,4 +1,5 @@
 pom.xml
+pom.xml.asc
 *jar
 /lib/
 /classes/
@@ -7,3 +8,4 @@ pom.xml
 .lein-failures
 .lein-deps-sum
 .lein-env
+.lein-repl-history
