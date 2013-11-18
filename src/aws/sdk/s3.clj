@@ -52,14 +52,21 @@ Map may also contain the configuration keys :conn-timeout,
 :socket-timeout, :max-conns, and :max-retries."
   [cred]
   (let [client-configuration (ClientConfiguration.)]
+    (.setProxyHost "localhost")
+    (.setProxyPort 8080)
+
     (when-let [conn-timeout (:conn-timeout cred)]
       (.setConnectionTimeout client-configuration conn-timeout))
+
     (when-let [socket-timeout (:socket-timeout cred)]
       (.setSocketTimeout client-configuration socket-timeout))
+
     (when-let [max-retries (:max-retries cred)]
       (.setMaxErrorRetry client-configuration max-retries))
+
     (when-let [max-conns (:max-conns cred)]
       (.setMaxConnections client-configuration max-conns))
+
     (let [aws-creds (BasicAWSCredentials. (:access-key cred) (:secret-key cred))
           client    (AmazonS3Client. aws-creds client-configuration)]
       (when-let [endpoint (:endpoint cred)]
