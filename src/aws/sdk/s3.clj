@@ -37,7 +37,6 @@
            com.amazonaws.services.s3.model.AbortMultipartUploadRequest
            com.amazonaws.services.s3.model.CompleteMultipartUploadRequest
            com.amazonaws.services.s3.model.UploadPartRequest
-           com.amazonaws.Protocol
            java.util.concurrent.Executors
            java.io.ByteArrayInputStream
            java.io.File
@@ -51,15 +50,6 @@ Map may also contain the configuration keys :conn-timeout,
 :socket-timeout, :max-conns, and :max-retries."
   [cred]
   (let [client-configuration (ClientConfiguration.)]
-
-    (when-let [proxyHost (:proxyHost cred)]
-      (.setProxyHost client-configuration proxyHost))
-    (when-let [proxyPort (:proxyPort cred)]
-      (.setProxyPort client-configuration proxyPort))
-    (when-let [protocolStr (:protocolStr cred)]
-      (if (= (clojure.string/upper-case protocolStr) "HTTP")
-        (.setProtocol client-configuration Protocol/HTTP)
-        (.setProtocol client-configuration Protocol/HTTPS)))
     (when-let [conn-timeout (:conn-timeout cred)]
       (.setConnectionTimeout client-configuration conn-timeout))
     (when-let [socket-timeout (:socket-timeout cred)]
@@ -69,7 +59,7 @@ Map may also contain the configuration keys :conn-timeout,
     (when-let [max-conns (:max-conns cred)]
       (.setMaxConnections client-configuration max-conns))
     (let [aws-creds (BasicAWSCredentials. (:access-key cred) (:secret-key cred))
-          client (AmazonS3Client. aws-creds client-configuration)]
+          client    (AmazonS3Client. aws-creds client-configuration)]
       (when-let [endpoint (:endpoint cred)]
         (.setEndpoint client endpoint))
       client)))
@@ -85,12 +75,12 @@ Map may also contain the configuration keys :conn-timeout,
 (extend-protocol Mappable
   Bucket
   (to-map [bucket]
-    {:name (.getName bucket)
+    {:name          (.getName bucket)
      :creation-date (.getCreationDate bucket)
-     :owner (to-map (.getOwner bucket))})
+     :owner         (to-map (.getOwner bucket))})
   Owner
   (to-map [owner]
-    {:id (.getId owner)
+    {:id           (.getId owner)
      :display-name (.getDisplayName owner)})
   nil
   (to-map [_] nil))
@@ -131,9 +121,9 @@ Map may also contain the configuration keys :conn-timeout,
   String
   (put-request [s]
     (let [bytes (.getBytes s)]
-      {:input-stream (ByteArrayInputStream. bytes)
-       :content-length (count bytes)
-       :content-type (str "text/plain; charset=" (.name (Charset/defaultCharset)))})))
+      {:input-stream     (ByteArrayInputStream. bytes)
+       :content-length   (count bytes)
+       :content-type     (str "text/plain; charset=" (.name (Charset/defaultCharset)))})))
 
 (defmacro set-attr
   "Set an attribute on an object if not nil."
@@ -149,16 +139,22 @@ Map may also contain the configuration keys :conn-timeout,
   "Convert a map of object metadata into a ObjectMetadata instance."
   [metadata]
   (doto (ObjectMetadata.)
-    (set-attr .setCacheControl (:cache-control metadata))
-    (set-attr .setContentDisposition (:content-disposition metadata))
-    (set-attr .setContentEncoding (:content-encoding metadata))
-    (set-attr .setContentLength (:content-length metadata))
-    (set-attr .setContentMD5 (:content-md5 metadata))
-    (set-attr .setContentType (:content-type metadata))
+    (set-attr .setCacheControl         (:cache-control metadata))
+    (set-attr .setContentDisposition   (:content-disposition metadata))
+    (set-attr .setContentEncoding      (:content-encoding metadata))
+    (set-attr .setContentLength        (:content-length metadata))
+    (set-attr .setContentMD5           (:content-md5 metadata))
+    (set-attr .setContentType          (:content-type metadata))
     (set-attr .setServerSideEncryption (:server-side-encryption metadata))
     (set-attr .setUserMetadata
       (walk/stringify-keys (dissoc metadata
-                             :cache-control :content-disposition :content-encoding :content-length :content-md5 :content-type :server-side-encryption )))))
+                             :cache-control
+                             :content-disposition
+                             :content-encoding
+                             :content-length
+                             :content-md5
+                             :content-type
+                             :server-side-encryption)))))
 
 (defn- ^PutObjectRequest ->PutObjectRequest
   "Create a PutObjectRequest instance from a bucket name, key and put request
@@ -167,13 +163,13 @@ Map may also contain the configuration keys :conn-timeout,
   (cond
     (:file request)
     (let [put-obj-req (PutObjectRequest. bucket key ^java.io.File (:file request))]
-      (.setMetadata put-obj-req (map->ObjectMetadata (dissoc request :file )))
+      (.setMetadata put-obj-req (map->ObjectMetadata (dissoc request :file)))
       put-obj-req)
     (:input-stream request)
     (PutObjectRequest.
       bucket key
       (:input-stream request)
-      (map->ObjectMetadata (dissoc request :input-stream )))))
+      (map->ObjectMetadata (dissoc request :input-stream)))))
 
 (declare create-acl) ; used by put-object
 
@@ -222,7 +218,7 @@ Map may also contain the configuration keys :conn-timeout,
 
 (defn- upload-part
   [{cred :cred bucket :bucket key :key upload-id :upload-id
-    part-size :part-size offset :offset ^java.io.File file :file } ]
+    part-size :part-size offset :offset ^java.io.File file :file}]
     (.getPartETag
       (.uploadPart
         (s3-client cred)
@@ -233,7 +229,7 @@ Map may also contain the configuration keys :conn-timeout,
           (.setPartNumber (+ 1 (/ offset part-size)))
           (.setFileOffset offset)
           (.setPartSize ^long (min part-size (- (.length file) offset)))
-          (.setFile file)))) )
+          (.setFile file)))))
 
     (defn put-multipart-object
       "Do a multipart upload of a file into a S3 bucket at the specified key.
@@ -249,14 +245,14 @@ Map may also contain the configuration keys :conn-timeout,
       [cred bucket key ^java.io.File file & [{:keys [part-size threads]
                                               :or {part-size (* 5 1024 1024) threads 16}}]]
       (let [upload-id (initiate-multipart-upload cred bucket key)
-            upload {:upload-id upload-id :cred cred :bucket bucket :key key :file file}
-            pool (Executors/newFixedThreadPool threads)
-            offsets (range 0 (.length file) part-size)
-            tasks (map #(fn [] (upload-part (assoc upload :offset % :part-size part-size)))
-                    offsets)]
+            upload    {:upload-id upload-id :cred cred :bucket bucket :key key :file file}
+            pool      (Executors/newFixedThreadPool threads)
+            offsets   (range 0 (.length file) part-size)
+            tasks     (map #(fn [] (upload-part (assoc upload :offset % :part-size part-size)))
+                        offsets)]
         (try
           (complete-multipart-upload
-            (assoc upload :e-tags (map #(.get ^java.util.concurrent.Future %) (.invokeAll pool tasks))))
+            (assoc upload :e-tags (map #(.get ^java.util.concurrent.Future %)  (.invokeAll pool tasks))))
           (catch Exception ex
             (abort-multipart-upload upload)
             (.shutdown pool)
@@ -266,70 +262,70 @@ Map may also contain the configuration keys :conn-timeout,
     (extend-protocol Mappable
       S3Object
       (to-map [object]
-        {:content (.getObjectContent object)
+        {:content  (.getObjectContent object)
          :metadata (to-map (.getObjectMetadata object))
-         :bucket (.getBucketName object)
-         :key (.getKey object)})
+         :bucket   (.getBucketName object)
+         :key      (.getKey object)})
       ObjectMetadata
       (to-map [metadata]
-        {:cache-control (.getCacheControl metadata)
-         :content-disposition (.getContentDisposition metadata)
-         :content-encoding (.getContentEncoding metadata)
-         :content-length (.getContentLength metadata)
-         :content-md5 (.getContentMD5 metadata)
-         :content-type (.getContentType metadata)
-         :etag (.getETag metadata)
-         :last-modified (.getLastModified metadata)
+        {:cache-control          (.getCacheControl metadata)
+         :content-disposition    (.getContentDisposition metadata)
+         :content-encoding       (.getContentEncoding metadata)
+         :content-length         (.getContentLength metadata)
+         :content-md5            (.getContentMD5 metadata)
+         :content-type           (.getContentType metadata)
+         :etag                   (.getETag metadata)
+         :last-modified          (.getLastModified metadata)
          :server-side-encryption (.getServerSideEncryption metadata)
          :user (walk/keywordize-keys (into {} (.getUserMetadata metadata)))
-         :version-id (.getVersionId metadata)})
+         :version-id             (.getVersionId metadata)})
       ObjectListing
       (to-map [listing]
-        {:bucket (.getBucketName listing)
-         :objects (map to-map (.getObjectSummaries listing))
-         :prefix (.getPrefix listing)
+        {:bucket          (.getBucketName listing)
+         :objects         (map to-map (.getObjectSummaries listing))
+         :prefix          (.getPrefix listing)
          :common-prefixes (seq (.getCommonPrefixes listing))
-         :truncated? (.isTruncated listing)
-         :max-keys (.getMaxKeys listing)
-         :marker (.getMarker listing)
-         :next-marker (.getNextMarker listing)})
+         :truncated?      (.isTruncated listing)
+         :max-keys        (.getMaxKeys listing)
+         :marker          (.getMarker listing)
+         :next-marker     (.getNextMarker listing)})
       S3ObjectSummary
       (to-map [summary]
         {:metadata {:content-length (.getSize summary)
-                    :etag (.getETag summary)
-                    :last-modified (.getLastModified summary)}
-         :bucket (.getBucketName summary)
-         :key (.getKey summary)})
+                    :etag           (.getETag summary)
+                    :last-modified  (.getLastModified summary)}
+         :bucket   (.getBucketName summary)
+         :key      (.getKey summary)})
       S3VersionSummary
       (to-map [summary]
         {:metadata {:content-length (.getSize summary)
-                    :etag (.getETag summary)
-                    :last-modified (.getLastModified summary)}
-         :version-id (.getVersionId summary)
-         :latest? (.isLatest summary)
+                    :etag           (.getETag summary)
+                    :last-modified  (.getLastModified summary)}
+         :version-id     (.getVersionId summary)
+         :latest?        (.isLatest summary)
          :delete-marker? (.isDeleteMarker summary)
-         :bucket (.getBucketName summary)
-         :key (.getKey summary)})
+         :bucket         (.getBucketName summary)
+         :key            (.getKey summary)})
       VersionListing
       (to-map [listing]
-        {:bucket (.getBucketName listing)
-         :versions (map to-map (.getVersionSummaries listing))
-         :prefix (.getPrefix listing)
-         :common-prefixes (seq (.getCommonPrefixes listing))
-         :delimiter (.getDelimiter listing)
-         :truncated? (.isTruncated listing)
-         :max-results (maybe-int (.getMaxKeys listing)) ; AWS API is inconsistent, should be .getMaxResults
-         :key-marker (.getKeyMarker listing)
-         :next-key-marker (.getNextKeyMarker listing)
+        {:bucket                 (.getBucketName listing)
+         :versions               (map to-map (.getVersionSummaries listing))
+         :prefix                 (.getPrefix listing)
+         :common-prefixes        (seq (.getCommonPrefixes listing))
+         :delimiter              (.getDelimiter listing)
+         :truncated?             (.isTruncated listing)
+         :max-results            (maybe-int (.getMaxKeys listing)) ; AWS API is inconsistent, should be .getMaxResults
+         :key-marker             (.getKeyMarker listing)
+         :next-key-marker        (.getNextKeyMarker listing)
          :next-version-id-marker (.getNextVersionIdMarker listing)
-         :version-id-marker (.getVersionIdMarker listing)})
+         :version-id-marker      (.getVersionIdMarker listing)})
       CopyObjectResult
       (to-map [result]
-        {:etag (.getETag result)
-         :expiration-time (.getExpirationTime result)
+        {:etag                    (.getETag result)
+         :expiration-time         (.getExpirationTime result)
          :expiration-time-rule-id (.getExpirationTimeRuleId result)
-         :last-modified-date (.getLastModifiedDate result)
-         :server-side-encryption (.getServerSideEncryption result)}))
+         :last-modified-date      (.getLastModifiedDate result)
+         :server-side-encryption  (.getServerSideEncryption result)}))
 
     (defn get-object
       "Get an object from an S3 bucket. The object is returned as a map with the
@@ -373,10 +369,10 @@ Map may also contain the configuration keys :conn-timeout,
       [request]
       (doto (ListObjectsRequest.)
         (set-attr .setBucketName (:bucket request))
-        (set-attr .setDelimiter (:delimiter request))
-        (set-attr .setMarker (:marker request))
-        (set-attr .setMaxKeys (maybe-int (:max-keys request)))
-        (set-attr .setPrefix (:prefix request))))
+        (set-attr .setDelimiter  (:delimiter request))
+        (set-attr .setMarker     (:marker request))
+        (set-attr .setMaxKeys    (maybe-int (:max-keys request)))
+        (set-attr .setPrefix     (:prefix request))))
 
     (defn- http-method [method]
       (-> method name str/upper-case HttpMethod/valueOf))
@@ -392,7 +388,7 @@ Map may also contain the configuration keys :conn-timeout,
           bucket
           key
           (coerce/to-date (:expires options (-> 1 t/days t/from-now)))
-          (http-method (:http-method options :get )))))
+          (http-method (:http-method options :get)))))
 
     (defn list-objects
       "List the objects in an S3 bucket. A optional map of options may be supplied.
@@ -445,11 +441,11 @@ Map may also contain the configuration keys :conn-timeout,
       "Create a ListVersionsRequest instance from a map of values."
       [request]
       (doto (ListVersionsRequest.)
-        (set-attr .setBucketName (:bucket request))
-        (set-attr .setDelimiter (:delimiter request))
-        (set-attr .setKeyMarker (:key-marker request))
-        (set-attr .setMaxResults (:max-results request))
-        (set-attr .setPrefix (:prefix request))
+        (set-attr .setBucketName      (:bucket request))
+        (set-attr .setDelimiter       (:delimiter request))
+        (set-attr .setKeyMarker       (:key-marker request))
+        (set-attr .setMaxResults      (:max-results request))
+        (set-attr .setPrefix          (:prefix request))
         (set-attr .setVersionIdMarker (:version-id-marker request))))
 
     (defn list-versions
@@ -494,7 +490,7 @@ Map may also contain the configuration keys :conn-timeout,
     (extend-protocol ToClojure
       CanonicalGrantee
       (to-clojure [grantee]
-        {:id (.getIdentifier grantee)
+        {:id           (.getIdentifier grantee)
          :display-name (.getDisplayName grantee)})
       EmailAddressGrantee
       (to-clojure [grantee]
@@ -502,21 +498,27 @@ Map may also contain the configuration keys :conn-timeout,
       GroupGrantee
       (to-clojure [grantee]
         (condp = grantee
-          GroupGrantee/AllUsers :all-users GroupGrantee/AuthenticatedUsers :authenticated-users GroupGrantee/LogDelivery :log-delivery ))
+          GroupGrantee/AllUsers           :all-users
+          GroupGrantee/AuthenticatedUsers :authenticated-users
+          GroupGrantee/LogDelivery        :log-delivery))
       Permission
       (to-clojure [permission]
         (condp = permission
-          Permission/FullControl :full-control Permission/Read :read Permission/ReadAcp :read-acp Permission/Write :write Permission/WriteAcp :write-acp )))
+          Permission/FullControl :full-control
+          Permission/Read        :read
+          Permission/ReadAcp     :read-acp
+          Permission/Write       :write
+          Permission/WriteAcp    :write-acp)))
 
     (extend-protocol Mappable
       Grant
       (to-map [grant]
-        {:grantee (to-clojure (.getGrantee grant))
+        {:grantee    (to-clojure (.getGrantee grant))
          :permission (to-clojure (.getPermission grant))})
       AccessControlList
       (to-map [acl]
         {:grants (set (map to-map (.getGrants acl)))
-         :owner (to-map (.getOwner acl))}))
+         :owner  (to-map (.getOwner acl))}))
 
     (defn get-bucket-acl
       "Get the access control list (ACL) for the supplied bucket. The ACL is a map
@@ -540,18 +542,18 @@ Map may also contain the configuration keys :conn-timeout,
     (defn- permission [perm]
       (case perm
         :full-control Permission/FullControl
-        :read Permission/Read
-        :read-acp Permission/ReadAcp
-        :write Permission/Write
-        :write-acp Permission/WriteAcp))
+        :read         Permission/Read
+        :read-acp     Permission/ReadAcp
+        :write        Permission/Write
+        :write-acp    Permission/WriteAcp))
 
     (defn- grantee [grantee]
       (cond
         (keyword? grantee)
         (case grantee
-          :all-users GroupGrantee/AllUsers
+          :all-users           GroupGrantee/AllUsers
           :authenticated-users GroupGrantee/AuthenticatedUsers
-          :log-delivery GroupGrantee/LogDelivery)
+          :log-delivery        GroupGrantee/LogDelivery)
         (:id grantee)
         (CanonicalGrantee. (:id grantee))
         (:email grantee)
