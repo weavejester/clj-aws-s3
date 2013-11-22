@@ -51,9 +51,20 @@ Map may also contain the configuration keys :conn-timeout,
 :socket-timeout, :max-conns, and :max-retries."
   [cred]
   (let [client-configuration (ClientConfiguration.)]
-    (.setProxyHost client-configuration "localhost")
-    (.setProxyPort client-configuration 8080)
-    (.setProtocol client-configuration Protocol/HTTP)
+
+    (when-let [proxyHost (:proxyHost cred)]
+      (.setProxyHost client-configuration proxyHost))
+
+    (when-let [proxyPort (:proxyPort cred)]
+      (.setProxyPort client-configuration proxyPort))
+
+    (when-let [protocolStr (:protocolStr cred)]
+      (if (= (clojure.string/upper-case protocolStr) "HTTP")
+        (.setProtocol client-configuration Protocol/HTTP)
+        (.setProtocol client-configuration Protocol/HTTPS)))
+
+
+
     (when-let [conn-timeout (:conn-timeout cred)]
       (.setConnectionTimeout client-configuration conn-timeout))
     (when-let [socket-timeout (:socket-timeout cred)]
