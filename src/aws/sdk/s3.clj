@@ -377,6 +377,9 @@ Map may also contain the configuration keys :conn-timeout,
 (defn- http-method [method]
   (-> method name str/upper-case HttpMethod/valueOf))
 
+(defn get-url [cred bucket key]
+  (.toString (.getUrl (s3-client cred) bucket key)))
+
 (defn generate-presigned-url
   "Return a presigned URL for an S3 object. Accepts the following options:
     :expires     - the date at which the URL will expire (defaults to 1 day from now)
