@@ -230,10 +230,14 @@ Map may also contain the configuration keys :conn-timeout,
 (defn- upload-part
   [{cred :cred bucket :bucket key :key upload-id :upload-id
 <<<<<<< HEAD
+<<<<<<< HEAD
     part-size :part-size offset :offset ^java.io.File file :file}]
 =======
     part-size :part-size offset :offset ^java.io.File file :file}] 
 >>>>>>> 7721e79... blowing away whitespace changes
+=======
+    part-size :part-size offset :offset ^java.io.File file :file}] 
+>>>>>>> 0d345212340d41125aaba496bcaa257094570b42
   (.getPartETag
    (.uploadPart
     (s3-client cred)
