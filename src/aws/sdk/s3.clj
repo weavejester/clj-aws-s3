@@ -333,7 +333,16 @@ Map may also contain the configuration keys :conn-timeout,
     :content  - an InputStream to the content
     :metadata - a map of the object's metadata
     :bucket   - the name of the bucket
-    :key      - the object's key"
+    :key      - the object's key
+  Be extremely careful when using this method; the :content value in the returned
+  map contains a direct stream of data from the HTTP connection. The underlying
+  HTTP connection cannot be closed until the user finishes reading the data and
+  closes the stream.
+  Therefore:
+    * Use the data from the :content input stream as soon as possible
+    * Close the :content input stream as soon as possible
+  If these rules are not followed, the client can run out of resources by
+  allocating too many open, but unused, HTTP connections."
   [cred ^String bucket ^String key]
   (to-map (.getObject (s3-client cred) bucket key)))
 
