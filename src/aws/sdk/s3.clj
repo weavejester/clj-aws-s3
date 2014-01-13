@@ -9,6 +9,7 @@
             [clj-time.coerce :as coerce]
             [clojure.walk :as walk])
   (:import com.amazonaws.auth.BasicAWSCredentials
+           com.amazonaws.auth.BasicSessionCredentials
            com.amazonaws.services.s3.AmazonS3Client
            com.amazonaws.AmazonServiceException
            com.amazonaws.ClientConfiguration
@@ -58,8 +59,12 @@ Map may also contain the configuration keys :conn-timeout,
       (.setMaxErrorRetry client-configuration max-retries))
     (when-let [max-conns (:max-conns cred)]
       (.setMaxConnections client-configuration max-conns))
-    (let [aws-creds (BasicAWSCredentials. (:access-key cred) (:secret-key cred))
-          client    (AmazonS3Client. aws-creds client-configuration)]
+    (let [aws-creds
+          (if (:token cred)
+            (BasicSessionCredentials. (:access-key cred) (:secret-key cred) (:token cred))
+            (BasicAWSCredentials. (:access-key cred) (:secret-key cred)))
+
+          client (AmazonS3Client. aws-creds client-configuration)]
       (when-let [endpoint (:endpoint cred)]
         (.setEndpoint client endpoint))
       client)))
