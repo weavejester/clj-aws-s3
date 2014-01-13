@@ -93,17 +93,17 @@ Map may also contain the configuration keys :conn-timeout,
 (defn bucket-exists?
   "Returns true if the supplied bucket name already exists in S3."
   [cred name]
-  (.doesBucketExist (s3-client cred) name))
+  (.doesBucketExist ^AmazonS3Client (s3-client cred) name))
 
 (defn create-bucket
   "Create a new S3 bucket with the supplied name."
   [cred ^String name]
-  (to-map (.createBucket (s3-client cred) name)))
+  (to-map (.createBucket ^AmazonS3Client (s3-client cred) name)))
 
 (defn delete-bucket
   "Delete the S3 bucket with the supplied name."
   [cred ^String name]
-  (.deleteBucket (s3-client cred) name))
+  (.deleteBucket ^AmazonS3Client (s3-client cred) name))
 
 (defn list-buckets
   "List all the S3 buckets for the supplied credentials. The buckets will be
@@ -112,7 +112,7 @@ Map may also contain the configuration keys :conn-timeout,
     :creation-date - the date when the bucket was created
     :owner         - the owner of the bucket"
   [cred]
-  (map to-map (.listBuckets (s3-client cred))))
+  (map to-map (.listBuckets ^AmazonS3Client (s3-client cred))))
 
 (defprotocol ^{:no-doc true} ToPutRequest
   "A protocol for constructing a map that represents an S3 put request."
@@ -200,25 +200,25 @@ Map may also contain the configuration keys :conn-timeout,
   (let [req (->> (merge (put-request value) metadata)
                  (->PutObjectRequest bucket key))]
     (when permissions
-      (.setAccessControlList req (create-acl permissions)))
-    (.putObject (s3-client cred) req)))
+      (.setAccessControlList ^PutObjectRequest req (create-acl permissions)))
+    (.putObject ^AmazonS3Client (s3-client cred) req)))
 
 (defn- initiate-multipart-upload
   [cred bucket key] 
-  (.getUploadId (.initiateMultipartUpload 
-                  (s3-client cred) 
+  (.getUploadId (.initiateMultipartUpload
+                  ^AmazonS3Client (s3-client cred)
                   (InitiateMultipartUploadRequest. bucket key))))
 
 (defn- abort-multipart-upload
   [{cred :cred bucket :bucket key :key upload-id :upload-id}] 
   (.abortMultipartUpload 
-    (s3-client cred) 
+    ^AmazonS3Client (s3-client cred)
     (AbortMultipartUploadRequest. bucket key upload-id)))
 
 (defn- complete-multipart-upload
   [{cred :cred bucket :bucket key :key upload-id :upload-id e-tags :e-tags}] 
   (.completeMultipartUpload
-    (s3-client cred)
+    ^AmazonS3Client (s3-client cred)
     (CompleteMultipartUploadRequest. bucket key upload-id e-tags)))
 
 (defn- upload-part
@@ -226,7 +226,7 @@ Map may also contain the configuration keys :conn-timeout,
     part-size :part-size offset :offset ^java.io.File file :file}] 
   (.getPartETag
    (.uploadPart
-    (s3-client cred)
+    ^AmazonS3Client (s3-client cred)
     (doto (UploadPartRequest.)
       (.setBucketName bucket)
       (.setKey key)
@@ -349,7 +349,7 @@ Map may also contain the configuration keys :conn-timeout,
   If these rules are not followed, the client can run out of resources by
   allocating too many open, but unused, HTTP connections."
   [cred ^String bucket ^String key]
-  (to-map (.getObject (s3-client cred) bucket key)))
+  (to-map (.getObject ^AmazonS3Client (s3-client cred) bucket key)))
 
 (defn- map->GetObjectMetadataRequest
   "Create a ListObjectsRequest instance from a map of values."
@@ -374,7 +374,7 @@ Map may also contain the configuration keys :conn-timeout,
   [cred bucket key & [options]]
   (to-map
    (.getObjectMetadata
-    (s3-client cred)
+    ^AmazonS3Client (s3-client cred)
     (map->GetObjectMetadataRequest (merge {:bucket bucket :key key} options)))))
 
 (defn- map->ListObjectsRequest
@@ -398,7 +398,7 @@ Map may also contain the configuration keys :conn-timeout,
   [cred bucket key & [options]]
   (.toString
    (.generatePresignedUrl
-    (s3-client cred)
+    ^AmazonS3Client (s3-client cred)
     bucket
     key
     (coerce/to-date (:expires options (-> 1 t/days t/from-now)))
@@ -424,13 +424,13 @@ Map may also contain the configuration keys :conn-timeout,
   [cred bucket & [options]]
   (to-map
    (.listObjects
-    (s3-client cred)
+    ^AmazonS3Client (s3-client cred)
     (map->ListObjectsRequest (merge {:bucket bucket} options)))))
 
 (defn delete-object
   "Delete an object from an S3 bucket."
   [cred bucket key]
-  (.deleteObject (s3-client cred) bucket key))
+  (.deleteObject ^AmazonS3Client (s3-client cred) bucket key))
 
 (defn object-exists?
   "Returns true if an object exists in the supplied bucket and key."
@@ -449,7 +449,7 @@ Map may also contain the configuration keys :conn-timeout,
   ([cred bucket src-key dest-key]
      (copy-object cred bucket src-key bucket dest-key))
   ([cred src-bucket src-key dest-bucket dest-key]
-     (to-map (.copyObject (s3-client cred) src-bucket src-key dest-bucket dest-key))))
+     (to-map (.copyObject ^AmazonS3Client (s3-client cred) src-bucket src-key dest-bucket dest-key))))
 
 (defn- map->ListVersionsRequest
   "Create a ListVersionsRequest instance from a map of values."
@@ -490,13 +490,13 @@ Map may also contain the configuration keys :conn-timeout,
  [cred bucket & [options]]
  (to-map
    (.listVersions
-    (s3-client cred)
+    ^AmazonS3Client (s3-client cred)
     (map->ListVersionsRequest (merge {:bucket bucket} options)))))
 
 (defn delete-version
   "Deletes a specific version of the specified object in the specified bucket."
   [cred bucket key version-id]
-  (.deleteVersion (s3-client cred) bucket key version-id))
+  (.deleteVersion ^AmazonS3Client (s3-client cred) bucket key version-id))
 
 (defprotocol ^{:no-doc true} ToClojure
   "Convert an object into an idiomatic Clojure value."
@@ -546,13 +546,13 @@ Map may also contain the configuration keys :conn-timeout,
     :permission - the type of permission (:read, :write, :read-acp, :write-acp or
                   :full-control)."
   [cred ^String bucket]
-  (to-map (.getBucketAcl (s3-client cred) bucket)))
+  (to-map (.getBucketAcl ^AmazonS3Client (s3-client cred) bucket)))
 
 (defn get-object-acl
   "Get the access control list (ACL) for the supplied object. See get-bucket-acl
   for a detailed description of the return value."
   [cred bucket key]
-  (to-map (.getObjectAcl (s3-client cred) bucket key)))
+  (to-map (.getObjectAcl ^AmazonS3Client (s3-client cred) bucket key)))
 
 (defn- permission [perm]
   (case perm
@@ -607,17 +607,17 @@ Map may also contain the configuration keys :conn-timeout,
       (grant {:email \"foo@example.com\"} :full-control)
       (revoke {:email \"bar@example.com\"} :write))"
   [cred ^String bucket & funcs]
-  (let [acl (.getBucketAcl (s3-client cred) bucket)]
+  (let [acl (.getBucketAcl ^AmazonS3Client (s3-client cred) bucket)]
     (update-acl acl funcs)
-    (.setBucketAcl (s3-client cred) bucket acl)))
+    (.setBucketAcl ^AmazonS3Client (s3-client cred) bucket acl)))
 
 (defn update-object-acl
   "Updates the access control list (ACL) for the supplied object using functions
   that update a set of grants (see update-bucket-acl for more details)."
   [cred ^String bucket ^String key & funcs]
-  (let [acl (.getObjectAcl (s3-client cred) bucket key)]
+  (let [acl (.getObjectAcl ^AmazonS3Client (s3-client cred) bucket key)]
     (update-acl acl funcs)
-    (.setObjectAcl (s3-client cred) bucket key acl)))
+    (.setObjectAcl ^AmazonS3Client (s3-client cred) bucket key acl)))
 
 (defn grant
   "Returns a function that adds a new grant map to a set of grants.
