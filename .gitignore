@@ -9,5 +9,3 @@ pom.xml.asc
 .lein-deps-sum
 .lein-env
 .lein-repl-history
-.idea
-*.iml
