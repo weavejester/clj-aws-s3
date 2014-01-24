@@ -18,6 +18,8 @@
            com.amazonaws.services.s3.model.Bucket
            com.amazonaws.services.s3.model.Grant
            com.amazonaws.services.s3.model.CanonicalGrantee
+           com.amazonaws.services.s3.model.DeleteObjectsRequest
+           com.amazonaws.services.s3.model.DeleteObjectsRequest$KeyVersion
            com.amazonaws.services.s3.model.CopyObjectResult
            com.amazonaws.services.s3.model.EmailAddressGrantee
            com.amazonaws.services.s3.model.GetObjectMetadataRequest
@@ -38,6 +40,7 @@
            com.amazonaws.services.s3.model.AbortMultipartUploadRequest
            com.amazonaws.services.s3.model.CompleteMultipartUploadRequest
            com.amazonaws.services.s3.model.UploadPartRequest
+           com.amazonaws.Protocol
            java.util.concurrent.Executors
            java.io.ByteArrayInputStream
            java.io.File
@@ -51,6 +54,14 @@ Map may also contain the configuration keys :conn-timeout,
 :socket-timeout, :max-conns, and :max-retries."
   [cred]
   (let [client-configuration (ClientConfiguration.)]
+    (when-let [proxy-host (:proxy-host cred)]
+      (.setProxyHost client-configuration proxy-host))
+    (when-let [proxy-port (:proxy-port cred)]
+      (.setProxyPort client-configuration proxy-port))
+    (when-let [protocol-str (:protocol-str cred)]
+      (if (= (clojure.string/upper-case protocol-str) "HTTP")
+        (.setProtocol client-configuration Protocol/HTTP)
+        (.setProtocol client-configuration Protocol/HTTPS)))
     (when-let [conn-timeout (:conn-timeout cred)]
       (.setConnectionTimeout client-configuration conn-timeout))
     (when-let [socket-timeout (:socket-timeout cred)]
@@ -223,7 +234,15 @@ Map may also contain the configuration keys :conn-timeout,
 
 (defn- upload-part
   [{cred :cred bucket :bucket key :key upload-id :upload-id
+<<<<<<< HEAD
+<<<<<<< HEAD
+    part-size :part-size offset :offset ^java.io.File file :file}]
+=======
     part-size :part-size offset :offset ^java.io.File file :file}] 
+>>>>>>> 7721e79... blowing away whitespace changes
+=======
+    part-size :part-size offset :offset ^java.io.File file :file}] 
+>>>>>>> 0d345212340d41125aaba496bcaa257094570b42
   (.getPartETag
    (.uploadPart
     (s3-client cred)
@@ -630,3 +649,7 @@ Map may also contain the configuration keys :conn-timeout,
   See update-bucket-acl."
   [grantee permission]
   #(disj % {:grantee grantee :permission permission}))
+<<<<<<< HEAD
+
+=======
+>>>>>>> 7721e79... blowing away whitespace changes
