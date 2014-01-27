@@ -53,13 +53,8 @@ Map may also contain the configuration keys :conn-timeout,
   [cred]
   (let [client-configuration (ClientConfiguration.)]
     (when-let [proxy-map (:proxy-map cred)]
-      (if (:proxy-host proxy-map) (.setProxyHost (:proxy-host proxy-map)))
-      (if (:proxy-port proxy-map) (.setProxyPort (:proxy-port proxy-map))))
-    ; (when-let [proxy-host (:proxy-host cred)]
-    ;   (.setProxyHost client-configuration proxy-host))
-    ; (when-let [proxy-port (:proxy-port cred)]
-    ;   (.setProxyPort client-configuration proxy-port))
-
+      (if (:proxy-host proxy-map) (.setProxyHost client-configuration (:proxy-host proxy-map)))
+      (if (:proxy-port proxy-map) (.setProxyPort client-configuration (:proxy-port proxy-map))))
     (when-let [protocol (:protocol cred)]
       (if (= protocol :http)
         (.setProtocol client-configuration Protocol/HTTP)
