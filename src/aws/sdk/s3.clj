@@ -52,11 +52,11 @@ Map may also contain the configuration keys :conn-timeout,
 :socket-timeout, :max-conns, and :max-retries."
   [cred]
   (let [client-configuration (ClientConfiguration.)]
-    (when-let [proxy-map (:proxy-map cred)]
-      (if (:proxy-host proxy-map) (.setProxyHost client-configuration (:proxy-host proxy-map)))
-      (if (:proxy-port proxy-map) (.setProxyPort client-configuration (:proxy-port proxy-map)))
-      (if (:username proxy-map) (.setProxyUserName client-configuration (:username proxy-map)))
-      (if (:password proxy-map) (.setProxyPassword client-configuration (:password proxy-map)))
+    (when-let [proxy (:proxy cred)]
+      (if (:host proxy) (.setProxyHost client-configuration (:host proxy)))
+      (if (:port proxy) (.setProxyPort client-configuration (:port proxy)))
+      (if (:username proxy) (.setProxyUserName client-configuration (:username proxy)))
+      (if (:password proxy) (.setProxyPassword client-configuration (:password proxy)))
       )
     (when-let [protocol (:protocol cred)]
       (if (= protocol :http)
