@@ -38,6 +38,7 @@
            com.amazonaws.services.s3.model.AbortMultipartUploadRequest
            com.amazonaws.services.s3.model.CompleteMultipartUploadRequest
            com.amazonaws.services.s3.model.UploadPartRequest
+           com.amazonaws.Protocol
            java.util.concurrent.Executors
            java.io.ByteArrayInputStream
            java.io.File
@@ -51,6 +52,16 @@ Map may also contain the configuration keys :conn-timeout,
 :socket-timeout, :max-conns, and :max-retries."
   [cred]
   (let [client-configuration (ClientConfiguration.)]
+    (when-let [proxy (:proxy cred)]
+      (if (:host proxy) (.setProxyHost client-configuration (:host proxy)))
+      (if (:port proxy) (.setProxyPort client-configuration (:port proxy)))
+      (if (:username proxy) (.setProxyUserName client-configuration (:username proxy)))
+      (if (:password proxy) (.setProxyPassword client-configuration (:password proxy)))
+      )
+    (when-let [protocol (:protocol cred)]
+      (if (= protocol :http)
+        (.setProtocol client-configuration Protocol/HTTP)
+        (.setProtocol client-configuration Protocol/HTTPS)))
     (when-let [conn-timeout (:conn-timeout cred)]
       (.setConnectionTimeout client-configuration conn-timeout))
     (when-let [socket-timeout (:socket-timeout cred)]
