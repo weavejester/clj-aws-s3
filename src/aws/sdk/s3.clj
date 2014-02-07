@@ -7,7 +7,8 @@
   (:require [clojure.string :as str]
             [clj-time.core :as t]
             [clj-time.coerce :as coerce]
-            [clojure.walk :as walk])
+            [clojure.walk :as walk]
+            [clojure.data.json :as json])
   (:import com.amazonaws.auth.BasicAWSCredentials
            com.amazonaws.auth.BasicSessionCredentials
            com.amazonaws.services.s3.AmazonS3Client
@@ -610,6 +611,12 @@ Map may also contain the configuration keys :conn-timeout,
   (let [acl (.getBucketAcl (s3-client cred) bucket)]
     (update-acl acl funcs)
     (.setBucketAcl (s3-client cred) bucket acl)))
+
+(defn update-bucket-policy
+  "Update the policy associated with the specified bucket."
+  [cred ^String name policy]
+  (let [policy-json (json/write-str policy)]
+    (.setBucketPolicy (s3-client cred) name policy-json)))
 
 (defn update-object-acl
   "Updates the access control list (ACL) for the supplied object using functions
