@@ -17,6 +17,7 @@
            com.amazonaws.HttpMethod
            com.amazonaws.services.s3.model.AccessControlList
            com.amazonaws.services.s3.model.Bucket
+           com.amazonaws.services.s3.model.BucketPolicy
            com.amazonaws.services.s3.model.Grant
            com.amazonaws.services.s3.model.CanonicalGrantee
            com.amazonaws.services.s3.model.CopyObjectResult
@@ -534,7 +535,10 @@ Map may also contain the configuration keys :conn-timeout,
   AccessControlList
   (to-map [acl]
     {:grants (set (map to-map (.getGrants acl)))
-     :owner  (to-map (.getOwner acl))}))
+     :owner  (to-map (.getOwner acl))})
+  BucketPolicy
+  (to-map [policy]
+    (json/read-str (.getPolicyText policy))))
 
 (defn get-bucket-acl
   "Get the access control list (ACL) for the supplied bucket. The ACL is a map
@@ -548,6 +552,11 @@ Map may also contain the configuration keys :conn-timeout,
                   :full-control)."
   [cred ^String bucket]
   (to-map (.getBucketAcl (s3-client cred) bucket)))
+
+(defn get-bucket-policy
+  "Get the bucket policy for the supplied bucket"
+  [cred ^String bucket]
+  (to-map (.getBucketPolicy (s3-client cred) bucket)))
 
 (defn get-object-acl
   "Get the access control list (ACL) for the supplied object. See get-bucket-acl
