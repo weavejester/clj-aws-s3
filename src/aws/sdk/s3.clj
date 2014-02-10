@@ -16,6 +16,7 @@
            com.amazonaws.HttpMethod
            com.amazonaws.services.s3.model.AccessControlList
            com.amazonaws.services.s3.model.Bucket
+           com.amazonaws.services.s3.model.BucketWebsiteConfiguration
            com.amazonaws.services.s3.model.Grant
            com.amazonaws.services.s3.model.CanonicalGrantee
            com.amazonaws.services.s3.model.CopyObjectResult
@@ -30,6 +31,9 @@
            com.amazonaws.services.s3.model.ObjectListing
            com.amazonaws.services.s3.model.Permission
            com.amazonaws.services.s3.model.PutObjectRequest
+           com.amazonaws.services.s3.model.RedirectRule
+           com.amazonaws.services.s3.model.RoutingRule
+           com.amazonaws.services.s3.model.RoutingRuleCondition
            com.amazonaws.services.s3.model.S3Object
            com.amazonaws.services.s3.model.S3ObjectSummary
            com.amazonaws.services.s3.model.S3VersionSummary
@@ -87,6 +91,27 @@ Map may also contain the configuration keys :conn-timeout,
   (to-map [owner]
     {:id           (.getId owner)
      :display-name (.getDisplayName owner)})
+  BucketWebsiteConfiguration
+  (to-map [config]
+    {:index-document-suffix (.getIndexDocumentSuffix config)
+     :error-document (.getErrorDocument config)
+     :redirect-all-requests-to (to-map (.getRedirectAllRequestsTo config))
+     :routing-rules (map to-map (.getRoutingRules config))})
+  RedirectRule
+  (to-map [rule]
+    {:host-name (.getHostName rule)
+     :http-redirect-code (.getHttpRedirectCode rule)
+     :protocol (.getprotocol rule)
+     :replace-key-prefix-with (.getReplaceKeyPrefixWith rule)
+     :replace-key-with (.getReplaceKeyWith rule)})
+  RoutingRule
+  (to-map [rule]
+    {:redirect (to-map (.getRedirect rule))
+     :condition (to-map (.getCondition rule))})
+  RoutingRuleCondition
+  (to-map [condition]
+    {:http-error-code-returned-equals (.getHttpErrorCodeReturnedEquals condition)
+     :key-prefix-equals (.getKeyPrefixEquals condition)})
   nil
   (to-map [_] nil))
 
@@ -547,6 +572,37 @@ Map may also contain the configuration keys :conn-timeout,
                   :full-control)."
   [cred ^String bucket]
   (to-map (.getBucketAcl (s3-client cred) bucket)))
+
+(defn get-bucket-website-config
+  "Get the website conifiguration for the supplied bucket.  The configuration
+  is a map containing the following keys:
+     :routing-rules - list of routing rules
+     :redirect-all-requests-to - a redirect rule for all requests
+     :index-document-suffix - the value for the index document
+     :error-document - the value for the error document
+
+   The routing rules themselves are maps with keys:
+      :redirect - a redirect rule
+      :condition - a routing rule condition
+
+   The redirects and redirect-all-requests-to are maps with keys:
+      :host-name - the host name used in the reponse's Location header
+      :http-redirect-code - the HTTP redirect code used in the response's
+                             Location header
+      :protocol - the protocol, http or https, used in the response's
+                  Location header
+      :replace-key-with - the object key used in the response's Location header
+      :replace-key-prefix-with - the object key name prefix that will replace
+                                 the value of KeyPrefixEquals in the redirect
+                                 request.
+
+   The routing rule condition themselves are maps with keys:
+      :http-error-code-returned-equals - The HTTP error code that must match
+                                         for the redirect to apply
+      :key-prefix-equals - The object key name prefix from which
+                           requests will be redirected."
+  [cred name]
+  (to-map (.getBucketWebsiteConfiguration (s3-client cred) name)))
 
 (defn get-object-acl
   "Get the access control list (ACL) for the supplied object. See get-bucket-acl
