@@ -20,6 +20,7 @@
            com.amazonaws.services.s3.model.CanonicalGrantee
            com.amazonaws.services.s3.model.CopyObjectResult
            com.amazonaws.services.s3.model.EmailAddressGrantee
+           com.amazonaws.services.s3.model.GetObjectRequest
            com.amazonaws.services.s3.model.GetObjectMetadataRequest
            com.amazonaws.services.s3.model.Grant
            com.amazonaws.services.s3.model.GroupGrantee
@@ -348,8 +349,10 @@ Map may also contain the configuration keys :conn-timeout,
     * Close the :content input stream as soon as possible
   If these rules are not followed, the client can run out of resources by
   allocating too many open, but unused, HTTP connections."
-  [cred ^String bucket ^String key]
-  (to-map (.getObject (s3-client cred) bucket key)))
+  ([cred ^String bucket ^String key]
+     (to-map (.getObject (s3-client cred) bucket key)))
+  ([cred ^String bucket ^String key ^String version-id]
+     (to-map (.getObject (s3-client cred) (GetObjectRequest. bucket key version-id)))))
 
 (defn- map->GetObjectMetadataRequest
   "Create a ListObjectsRequest instance from a map of values."
