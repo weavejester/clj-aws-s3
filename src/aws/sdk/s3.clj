@@ -554,7 +554,10 @@ Map may also contain the configuration keys :conn-timeout,
   (to-map (.getBucketAcl (s3-client cred) bucket)))
 
 (defn get-bucket-policy
-  "Get the bucket policy for the supplied bucket"
+  "Get the bucket policy for the supplied bucket
+  For details on the policy data structure please refer
+  to the AWS documentation:
+  http://docs.aws.amazon.com/AmazonS3/latest/dev/AccessPolicyLanguage.html"
   [cred ^String bucket]
   (to-map (.getBucketPolicy (s3-client cred) bucket)))
 
@@ -622,7 +625,10 @@ Map may also contain the configuration keys :conn-timeout,
     (.setBucketAcl (s3-client cred) bucket acl)))
 
 (defn update-bucket-policy
-  "Update the policy associated with the specified bucket."
+  "Update the policy associated with the specified bucket.
+  For details on the policy data structure please refer
+  to the AWS documentation:
+  http://docs.aws.amazon.com/AmazonS3/latest/dev/AccessPolicyLanguage.html"
   [cred ^String name policy]
   (let [policy-json (json/generate-string policy)]
     (.setBucketPolicy (s3-client cred) name policy-json)))
