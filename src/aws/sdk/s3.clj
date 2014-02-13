@@ -7,7 +7,8 @@
   (:require [clojure.string :as str]
             [clj-time.core :as t]
             [clj-time.coerce :as coerce]
-            [clojure.walk :as walk])
+            [clojure.walk :as walk]
+            [clojure.data.json :as json])
   (:import com.amazonaws.auth.BasicAWSCredentials
            com.amazonaws.auth.BasicSessionCredentials
            com.amazonaws.services.s3.AmazonS3Client
@@ -16,6 +17,7 @@
            com.amazonaws.HttpMethod
            com.amazonaws.services.s3.model.AccessControlList
            com.amazonaws.services.s3.model.Bucket
+           com.amazonaws.services.s3.model.BucketPolicy
            com.amazonaws.services.s3.model.Grant
            com.amazonaws.services.s3.model.CanonicalGrantee
            com.amazonaws.services.s3.model.CopyObjectResult
@@ -533,7 +535,10 @@ Map may also contain the configuration keys :conn-timeout,
   AccessControlList
   (to-map [acl]
     {:grants (set (map to-map (.getGrants acl)))
-     :owner  (to-map (.getOwner acl))}))
+     :owner  (to-map (.getOwner acl))})
+  BucketPolicy
+  (to-map [policy]
+    (json/read-str (.getPolicyText policy))))
 
 (defn get-bucket-acl
   "Get the access control list (ACL) for the supplied bucket. The ACL is a map
@@ -547,6 +552,11 @@ Map may also contain the configuration keys :conn-timeout,
                   :full-control)."
   [cred ^String bucket]
   (to-map (.getBucketAcl (s3-client cred) bucket)))
+
+(defn get-bucket-policy
+  "Get the bucket policy for the supplied bucket"
+  [cred ^String bucket]
+  (to-map (.getBucketPolicy (s3-client cred) bucket)))
 
 (defn get-object-acl
   "Get the access control list (ACL) for the supplied object. See get-bucket-acl
@@ -610,6 +620,12 @@ Map may also contain the configuration keys :conn-timeout,
   (let [acl (.getBucketAcl (s3-client cred) bucket)]
     (update-acl acl funcs)
     (.setBucketAcl (s3-client cred) bucket acl)))
+
+(defn update-bucket-policy
+  "Update the policy associated with the specified bucket."
+  [cred ^String name policy]
+  (let [policy-json (json/write-str policy)]
+    (.setBucketPolicy (s3-client cred) name policy-json)))
 
 (defn update-object-acl
   "Updates the access control list (ACL) for the supplied object using functions
