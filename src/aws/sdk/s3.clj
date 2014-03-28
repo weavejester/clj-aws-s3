@@ -399,13 +399,16 @@ Map may also contain the configuration keys :conn-timeout,
     :expires     - the date at which the URL will expire (defaults to 1 day from now)
     :http-method - the HTTP method for the URL (defaults to :get)"
   [cred bucket key & [options]]
-  (.toString
-   (.generatePresignedUrl
-    (s3-client cred)
-    bucket
-    key
-    (coerce/to-date (:expires options (-> 1 t/days t/from-now)))
-    (http-method (:http-method options :get)))))
+  (let [client (s3-client cred)
+        url (.toString
+             (.generatePresignedUrl
+              client
+              bucket
+              key
+              (coerce/to-date (:expires options (-> 1 t/days t/from-now)))
+              (http-method (:http-method options :get))))]
+    (.shutdown client)
+    url))
 
 (defn list-objects
   "List the objects in an S3 bucket. A optional map of options may be supplied.
