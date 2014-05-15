@@ -47,9 +47,9 @@
 
 (defn- s3-client*
   "Create an AmazonS3Client instance from a map of credentials.
-
-Map may also contain the configuration keys :conn-timeout,
-:socket-timeout, :max-conns, and :max-retries."
+   Map may also contain the configuration keys :conn-timeout,
+   :socket-timeout, :max-conns, :max-retries, :proxy-host 
+   and :proxy-port."
   [cred]
   (let [client-configuration (ClientConfiguration.)]
     (when-let [conn-timeout (:conn-timeout cred)]
@@ -60,6 +60,10 @@ Map may also contain the configuration keys :conn-timeout,
       (.setMaxErrorRetry client-configuration max-retries))
     (when-let [max-conns (:max-conns cred)]
       (.setMaxConnections client-configuration max-conns))
+    (when-let [proxy-host (:proxy-host cred)]
+      (.setProxyHost client-configuration proxy-host))
+    (when-let [proxy-port (:proxy-port cred)]
+      (.setProxyPort client-configuration proxy-port))
     (let [aws-creds
           (if (:token cred)
             (BasicSessionCredentials. (:access-key cred) (:secret-key cred) (:token cred))
