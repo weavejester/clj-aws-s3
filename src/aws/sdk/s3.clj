@@ -60,6 +60,14 @@ Map may also contain the configuration keys :conn-timeout,
       (.setMaxErrorRetry client-configuration max-retries))
     (when-let [max-conns (:max-conns cred)]
       (.setMaxConnections client-configuration max-conns))
+    (when-let [proxy (:proxy cred)]
+      (let [{:keys [host port user password domain]} proxy]
+        (doto client-configuration
+          (.setProxyHost host)
+          (.setProxyPort port)
+          (.setProxyUsername user)
+          (.setProxyPassword password)
+          (.setProxyDomain domain))))
     (let [aws-creds
           (if (:token cred)
             (BasicSessionCredentials. (:access-key cred) (:secret-key cred) (:token cred))
