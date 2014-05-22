@@ -3,7 +3,11 @@
 
   Each function takes a map of credentials as its first argument. The
   credentials map should contain an :access-key key and a :secret-key key,
-  and optionally an :endpoint key to denote an AWS endpoint."
+  optionally an :endpoint key to denote an AWS endpoint and optionally a :proxy
+  key to define a HTTP proxy to go through.
+
+  The :proxy key must contain keys for :host and :port, and may contain keys
+  for :user, :password, :domain and :workstation."
   (:require [clojure.string :as str]
             [clj-time.core :as t]
             [clj-time.coerce :as coerce]
@@ -46,10 +50,6 @@
            java.nio.charset.Charset))
 
 (defn- s3-client*
-  "Create an AmazonS3Client instance from a map of credentials.
-
-Map may also contain the configuration keys :conn-timeout,
-:socket-timeout, :max-conns, and :max-retries."
   [cred]
   (let [client-configuration (ClientConfiguration.)]
     (when-let [conn-timeout (:conn-timeout cred)]
@@ -60,6 +60,18 @@ Map may also contain the configuration keys :conn-timeout,
       (.setMaxErrorRetry client-configuration max-retries))
     (when-let [max-conns (:max-conns cred)]
       (.setMaxConnections client-configuration max-conns))
+    (when-let [proxy-host (get-in cred [:proxy :host])]
+      (.setProxyHost client-configuration proxy-host))
+    (when-let [proxy-port (get-in cred [:proxy :port])]
+      (.setProxyPort client-configuration proxy-port))
+    (when-let [proxy-user (get-in cred [:proxy :user])]
+      (.setProxyUsername client-configuration proxy-user))
+    (when-let [proxy-pass (get-in cred [:proxy :password])]
+      (.setProxyPassword client-configuration proxy-pass))
+    (when-let [proxy-domain (get-in cred [:proxy :domain])]
+      (.setProxyDomain client-configuration proxy-domain))
+    (when-let [proxy-workstation (get-in cred [:proxy :workstation])]
+      (.setProxyWorkstation client-configuration proxy-workstation))
     (let [aws-creds
           (if (:token cred)
             (BasicSessionCredentials. (:access-key cred) (:secret-key cred) (:token cred))
