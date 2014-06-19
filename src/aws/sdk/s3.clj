@@ -277,6 +277,33 @@
         (throw ex))
       (finally (.shutdown pool)))))
 
+(defn put-multipart-stream
+  "Like put-multipart-object, but it is single threaded and uses an input-stream
+   instead of a file as the data source. The single threading is intentional,
+   to allow for a future design where the input stream can lock in case upload
+   is faster than stream generation."
+  [cred bucket key input &[{:keys [part-size lock]
+                            :or {part-size (* 5 1024 1024)
+                                 lock (Object.)}}]]
+  (let [part-size (max 1024 (min (.available input) part-size))
+        upload-id (initiate-multipart-upload cred bucket key)
+        upload {:upload-id upload-id
+                :cred cred
+                :bucket bucket
+                :key key
+                :stream input}
+        e-tags (loop [offset 0 e-tags []]
+                 (if (zero? (.available input))
+                   ;; TODO: know when to wait for the stream instead of finishing
+                   (java.util.ArrayList. e-tags)
+                   (let [e-tag (upload-part (assoc upload :offset offset :part-size part-size))]
+                     (recur (inc offset) (conj e-tags e-tag)))))]
+    (try
+      (complete-multipart-upload (assoc upload :e-tags e-tags))
+      (catch Exception ex
+        (abort-multipart-upload upload)
+        (throw ex)))))
+
 (extend-protocol Mappable
   S3Object
   (to-map [object]
