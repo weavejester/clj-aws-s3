@@ -3,12 +3,17 @@
 
   Each function takes a map of credentials as its first argument. The
   credentials map should contain an :access-key key and a :secret-key key,
-  and optionally an :endpoint key to denote an AWS endpoint."
+  optionally an :endpoint key to denote an AWS endpoint and optionally a :proxy
+  key to define a HTTP proxy to go through.
+
+  The :proxy key must contain keys for :host and :port, and may contain keys
+  for :user, :password, :domain and :workstation."
   (:require [clojure.string :as str]
             [clj-time.core :as t]
             [clj-time.coerce :as coerce]
             [clojure.walk :as walk])
   (:import com.amazonaws.auth.BasicAWSCredentials
+           com.amazonaws.auth.BasicSessionCredentials
            com.amazonaws.services.s3.AmazonS3Client
            com.amazonaws.AmazonServiceException
            com.amazonaws.ClientConfiguration
@@ -19,7 +24,9 @@
            com.amazonaws.services.s3.model.CanonicalGrantee
            com.amazonaws.services.s3.model.CopyObjectResult
            com.amazonaws.services.s3.model.EmailAddressGrantee
+           com.amazonaws.services.s3.model.GetObjectRequest
            com.amazonaws.services.s3.model.GetObjectMetadataRequest
+           com.amazonaws.services.s3.model.Grant
            com.amazonaws.services.s3.model.GroupGrantee
            com.amazonaws.services.s3.model.ListObjectsRequest
            com.amazonaws.services.s3.model.ListVersionsRequest
@@ -43,10 +50,6 @@
            java.nio.charset.Charset))
 
 (defn- s3-client*
-  "Create an AmazonS3Client instance from a map of credentials.
-
-Map may also contain the configuration keys :conn-timeout,
-:socket-timeout, :max-conns, and :max-retries."
   [cred]
   (let [client-configuration (ClientConfiguration.)]
     (when-let [conn-timeout (:conn-timeout cred)]
@@ -57,13 +60,29 @@ Map may also contain the configuration keys :conn-timeout,
       (.setMaxErrorRetry client-configuration max-retries))
     (when-let [max-conns (:max-conns cred)]
       (.setMaxConnections client-configuration max-conns))
-    (let [aws-creds (BasicAWSCredentials. (:access-key cred) (:secret-key cred))
-          client    (AmazonS3Client. aws-creds client-configuration)]
+    (when-let [proxy-host (get-in cred [:proxy :host])]
+      (.setProxyHost client-configuration proxy-host))
+    (when-let [proxy-port (get-in cred [:proxy :port])]
+      (.setProxyPort client-configuration proxy-port))
+    (when-let [proxy-user (get-in cred [:proxy :user])]
+      (.setProxyUsername client-configuration proxy-user))
+    (when-let [proxy-pass (get-in cred [:proxy :password])]
+      (.setProxyPassword client-configuration proxy-pass))
+    (when-let [proxy-domain (get-in cred [:proxy :domain])]
+      (.setProxyDomain client-configuration proxy-domain))
+    (when-let [proxy-workstation (get-in cred [:proxy :workstation])]
+      (.setProxyWorkstation client-configuration proxy-workstation))
+    (let [aws-creds
+          (if (:token cred)
+            (BasicSessionCredentials. (:access-key cred) (:secret-key cred) (:token cred))
+            (BasicAWSCredentials. (:access-key cred) (:secret-key cred)))
+
+          client (AmazonS3Client. aws-creds client-configuration)]
       (when-let [endpoint (:endpoint cred)]
         (.setEndpoint client endpoint))
       client)))
 
-(def ^{:private true}
+(def ^{:private true :tag AmazonS3Client}
   s3-client
   (memoize s3-client*))
 
@@ -91,12 +110,12 @@ Map may also contain the configuration keys :conn-timeout,
 
 (defn create-bucket
   "Create a new S3 bucket with the supplied name."
-  [cred name]
+  [cred ^String name]
   (to-map (.createBucket (s3-client cred) name)))
 
 (defn delete-bucket
   "Delete the S3 bucket with the supplied name."
-  [cred name]
+  [cred ^String name]
   (.deleteBucket (s3-client cred) name))
 
 (defn list-buckets
@@ -155,13 +174,13 @@ Map may also contain the configuration keys :conn-timeout,
                                            :content-type
                                            :server-side-encryption)))))
 
-(defn- ->PutObjectRequest
+(defn- ^PutObjectRequest ->PutObjectRequest
   "Create a PutObjectRequest instance from a bucket name, key and put request
   map."
-  [bucket key request]
+  [^String bucket ^String key request]
   (cond
    (:file request)
-     (let [put-obj-req (PutObjectRequest. bucket key (:file request))]
+     (let [put-obj-req (PutObjectRequest. bucket key ^java.io.File (:file request))]
        (.setMetadata put-obj-req (map->ObjectMetadata (dissoc request :file)))
        put-obj-req)
    (:input-stream request)
@@ -217,26 +236,18 @@ Map may also contain the configuration keys :conn-timeout,
 
 (defn- upload-part
   [{cred :cred bucket :bucket key :key upload-id :upload-id
-    part-size :part-size offset :offset file :file stream :stream}] 
-  (let [request (UploadPartRequest.)]
-    (doto request
+    part-size :part-size offset :offset ^java.io.File file :file}] 
+  (.getPartETag
+   (.uploadPart
+    (s3-client cred)
+    (doto (UploadPartRequest.)
       (.setBucketName bucket)
       (.setKey key)
       (.setUploadId upload-id)
       (.setPartNumber (+ 1 (/ offset part-size)))
-      (.setFileOffset offset))
-    (if file
-      ;; either file or stream must be passed in
-      (doto request
-        (.setPartSize (min part-size (- (.length file) offset)))
-        (.setFile file))
-      (doto request
-        (.setPartSize (min part-size (.available stream)))
-        (.setInputStream stream)))
-    (.getPartETag
-     (.uploadPart
-      (s3-client cred)
-      request))))
+      (.setFileOffset offset)
+      (.setPartSize ^long (min part-size (- (.length file) offset)))
+      (.setFile file)))))
 
 (defn put-multipart-object
   "Do a multipart upload of a file into a S3 bucket at the specified key.
@@ -249,7 +260,7 @@ Map may also contain the configuration keys :conn-timeout,
                  or larger.  Defaults to 5mb
     :threads   - the number of threads that will upload parts concurrently.
                  Defaults to 16."
-  [cred bucket key file & [{:keys [part-size threads]
+  [cred bucket key ^java.io.File file & [{:keys [part-size threads]
                             :or {part-size (* 5 1024 1024) threads 16}}]]
   (let [upload-id (initiate-multipart-upload cred bucket key)
         upload    {:upload-id upload-id :cred cred :bucket bucket :key key :file file}
@@ -259,7 +270,7 @@ Map may also contain the configuration keys :conn-timeout,
                        offsets)]
     (try
       (complete-multipart-upload
-        (assoc upload :e-tags (map #(.get %) (.invokeAll pool tasks))))
+        (assoc upload :e-tags (map #(.get ^java.util.concurrent.Future %)  (.invokeAll pool tasks))))
       (catch Exception ex 
         (abort-multipart-upload upload) 
         (.shutdown pool)
@@ -367,9 +378,20 @@ Map may also contain the configuration keys :conn-timeout,
     :content  - an InputStream to the content
     :metadata - a map of the object's metadata
     :bucket   - the name of the bucket
-    :key      - the object's key"
-  [cred bucket key]
-  (to-map (.getObject (s3-client cred) bucket key)))
+    :key      - the object's key
+  Be extremely careful when using this method; the :content value in the returned
+  map contains a direct stream of data from the HTTP connection. The underlying
+  HTTP connection cannot be closed until the user finishes reading the data and
+  closes the stream.
+  Therefore:
+    * Use the data from the :content input stream as soon as possible
+    * Close the :content input stream as soon as possible
+  If these rules are not followed, the client can run out of resources by
+  allocating too many open, but unused, HTTP connections."
+  ([cred ^String bucket ^String key]
+     (to-map (.getObject (s3-client cred) bucket key)))
+  ([cred ^String bucket ^String key ^String version-id]
+     (to-map (.getObject (s3-client cred) (GetObjectRequest. bucket key version-id)))))
 
 (defn- map->GetObjectMetadataRequest
   "Create a ListObjectsRequest instance from a map of values."
@@ -399,6 +421,7 @@ Map may also contain the configuration keys :conn-timeout,
 
 (defn- map->ListObjectsRequest
   "Create a ListObjectsRequest instance from a map of values."
+  ^ListObjectsRequest
   [request]
   (doto (ListObjectsRequest.)
     (set-attr .setBucketName (:bucket request))
@@ -477,18 +500,19 @@ Map may also contain the configuration keys :conn-timeout,
     (set-attr .setBucketName      (:bucket request))
     (set-attr .setDelimiter       (:delimiter request))
     (set-attr .setKeyMarker       (:key-marker request))
-    (set-attr .setMaxResults      (:max-results request))
+    (set-attr .setMaxResults      (maybe-int (:max-results request)))
     (set-attr .setPrefix          (:prefix request))
     (set-attr .setVersionIdMarker (:version-id-marker request))))
 
 (defn list-versions
  "List the versions in an S3 bucket. A optional map of options may be supplied.
   Available options are:
-    :delimiter   - the delimiter used in prefix (such as a '/')
-    :key-marker  - read versions from the sorted list of all versions starting
-                   at this marker.
-    :max-results - read only this many versions
-    :prefix      - read only versions with keys having this prefix
+    :delimiter         - the delimiter used in prefix (such as a '/')
+    :key-marker        - read versions from the sorted list of all versions starting
+                         at this marker.
+    :max-results       - read only this many versions
+    :prefix            - read only versions with keys having this prefix
+    :version-id-marker - read objects after this version id
 
   The version listing will be returned as a map containing the following versions:
     :bucket                 - the name of the bucket
@@ -563,7 +587,7 @@ Map may also contain the configuration keys :conn-timeout,
     :grantee    - the individual or group being granted access
     :permission - the type of permission (:read, :write, :read-acp, :write-acp or
                   :full-control)."
-  [cred bucket]
+  [cred ^String bucket]
   (to-map (.getBucketAcl (s3-client cred) bucket)))
 
 (defn get-object-acl
@@ -592,19 +616,19 @@ Map may also contain the configuration keys :conn-timeout,
    (:email grantee)
      (EmailAddressGrantee. (:email grantee))))
 
-(defn- clear-acl [acl]
+(defn- clear-acl [^AccessControlList acl]
   (doseq [grantee (->> (.getGrants acl)
-                       (map #(.getGrantee %))
+                       (map #(.getGrantee ^Grant %))
                        (set))]
     (.revokeAllPermissions acl grantee)))
 
-(defn- add-acl-grants [acl grants]
+(defn- add-acl-grants [^AccessControlList acl grants]
   (doseq [g grants]
     (.grantPermission acl
       (grantee (:grantee g))
       (permission (:permission g)))))
 
-(defn- update-acl [acl funcs]
+(defn- update-acl [^AccessControlList acl funcs]
   (let [grants (:grants (to-map acl))
         update (apply comp (reverse funcs))]
     (clear-acl acl)
@@ -624,7 +648,7 @@ Map may also contain the configuration keys :conn-timeout,
       (grant :all-users :read)
       (grant {:email \"foo@example.com\"} :full-control)
       (revoke {:email \"bar@example.com\"} :write))"
-  [cred bucket & funcs]
+  [cred ^String bucket & funcs]
   (let [acl (.getBucketAcl (s3-client cred) bucket)]
     (update-acl acl funcs)
     (.setBucketAcl (s3-client cred) bucket acl)))
@@ -632,7 +656,7 @@ Map may also contain the configuration keys :conn-timeout,
 (defn update-object-acl
   "Updates the access control list (ACL) for the supplied object using functions
   that update a set of grants (see update-bucket-acl for more details)."
-  [cred bucket key & funcs]
+  [cred ^String bucket ^String key & funcs]
   (let [acl (.getObjectAcl (s3-client cred) bucket key)]
     (update-acl acl funcs)
     (.setObjectAcl (s3-client cred) bucket key acl)))
