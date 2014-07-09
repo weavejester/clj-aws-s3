@@ -24,6 +24,7 @@
            com.amazonaws.services.s3.model.CanonicalGrantee
            com.amazonaws.services.s3.model.CopyObjectResult
            com.amazonaws.services.s3.model.EmailAddressGrantee
+           com.amazonaws.services.s3.model.GeneratePresignedUrlRequest
            com.amazonaws.services.s3.model.GetObjectRequest
            com.amazonaws.services.s3.model.GetObjectMetadataRequest
            com.amazonaws.services.s3.model.Grant
@@ -408,16 +409,20 @@
 
 (defn generate-presigned-url
   "Return a presigned URL for an S3 object. Accepts the following options:
-    :expires     - the date at which the URL will expire (defaults to 1 day from now)
-    :http-method - the HTTP method for the URL (defaults to :get)"
-  [cred bucket key & [options]]
-  (.toString
-   (.generatePresignedUrl
-    (s3-client cred)
-    bucket
-    key
-    (coerce/to-date (:expires options (-> 1 t/days t/from-now)))
-    (http-method (:http-method options :get)))))
+    :expires      - the date at which the URL will expire (defaults to 1 day from now)
+    :http-method  - the HTTP method for the URL (defaults to :get)
+    :content-type - if specified sets the content type for the URL"
+  [cred bucket key & [options]]  
+  (let [content-type (:content-type options)
+        request (doto (GeneratePresignedUrlRequest. bucket key)
+                  (.setMethod (http-method (:http-method options :get)))
+                  (.setExpiration (coerce/to-date (:expires options (-> 1 t/days t/from-now)))))]
+    (.toString
+     (.generatePresignedUrl
+      (s3-client cred)
+      (if content-type
+        (doto request (.setContentType content-type))
+        request)))))
 
 (defn list-objects
   "List the objects in an S3 bucket. A optional map of options may be supplied.
