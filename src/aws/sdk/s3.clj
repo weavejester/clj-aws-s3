@@ -22,6 +22,7 @@
            com.amazonaws.services.s3.model.Bucket
            com.amazonaws.services.s3.model.Grant
            com.amazonaws.services.s3.model.CanonicalGrantee
+           com.amazonaws.services.s3.model.CopyObjectRequest
            com.amazonaws.services.s3.model.CopyObjectResult
            com.amazonaws.services.s3.model.EmailAddressGrantee
            com.amazonaws.services.s3.model.GetObjectRequest
@@ -464,7 +465,11 @@
   ([cred bucket src-key dest-key]
      (copy-object cred bucket src-key bucket dest-key))
   ([cred src-bucket src-key dest-bucket dest-key]
-     (to-map (.copyObject (s3-client cred) src-bucket src-key dest-bucket dest-key))))
+     (copy-object cred src-bucket src-key dest-bucket dest-key nil))
+  ([cred src-bucket src-key dest-bucket dest-key metadata]
+     (let [req (CopyObjectRequest. src-bucket src-key dest-bucket dest-key)]
+       (.setNewObjectMetadata req (map->ObjectMetadata metadata))
+       (to-map (.copyObject (s3-client cred) req)))))
 
 (defn- map->ListVersionsRequest
   "Create a ListVersionsRequest instance from a map of values."
