@@ -9,11 +9,11 @@
   (:refer-clojure :exclude [key])
   (:load "aws") ;; aws credentials and test bucket name
   (:use [aws.sdk.s3]
-        [clojure.test]))
-  ;; (:require [clojure.java.io :as io])
-  ;; (:import (java.util UUID)
-  ;;          (java.io ByteArrayInputStream
-  ;;                   ByteArrayOutputStream)))
+        [clojure.test])
+  (:require [clojure.java.io :as io])
+  (:import (java.util UUID)
+           (java.io ByteArrayInputStream
+                    ByteArrayOutputStream)))
 
 (def ^{:dynamic true} *creds*)
 
@@ -29,8 +29,26 @@
 (deftest t-test-bucket-exists
   (is (contains? (set (map :name (list-buckets *creds*))) test-bucket)))
 
-(deftest t-test-put-object
+(deftest t-put-object
   (let [t-key   "test-key"
         t-value "test-value"
         t-req   (put-object *creds* test-bucket t-key t-value)]
     (is (contains? (set (map :key (:objects (list-objects *creds* test-bucket)))) t-key))))
+
+(deftest t-put-multipart-stream
+  (let [t-key    "test-key"
+        t-value  (apply str (take 10 (repeat "testword ")))
+        t-stream (io/input-stream (.getBytes t-value))
+        t-req    (put-multipart-stream *creds* test-bucket t-key t-value)]
+    ))
+
+(let [t-key    "test-key"
+      t-value  (apply str (take 10 (repeat "testword ")))
+      t-stream (io/input-stream (.getBytes t-value))]
+    (put-multipart-stream c test-bucket t-key t-stream))
+
+(ByteArrayInputStream. (.getBytes (apply str (take 10 (repeat "testword ")))))
+
+(def c
+  {:access-key key
+   :secret-key skey})
