@@ -37,17 +37,23 @@
 
 (deftest t-put-multipart-stream
   (let [t-key    "test-key"
-        t-value  (apply str (take 10 (repeat "testword ")))
+        t-value  (apply str (take 3000 (repeat "testword ")))
         t-stream (io/input-stream (.getBytes t-value))
         t-req    (put-multipart-stream *creds* test-bucket t-key t-stream)]
     (is (object-exists? *creds* test-bucket t-key))
+    (is (= (slurp (:content (get-object c test-bucket t-key)))
+           t-value))
     (delete-object *creds* test-bucket t-key)))
 
 (comment
-  (let [t-key    "test-key"
-        t-value  (apply str (take 10 (repeat "testword ")))
-        t-stream (io/input-stream (.getBytes t-value))]
-    (put-multipart-stream *creds* test-bucket t-key t-stream))
+  (def c
+    {:access-key key
+     :secret-key skey})
 
-  (ByteArrayInputStream.
-   (.getBytes (apply str (take 10 (repeat "testword "))))))
+  (let [t-key    "test-key"
+        t-value  (apply str (take 3000 (repeat "testword ")))
+        t-stream (io/input-stream (.getBytes t-value))
+        t-req    (put-multipart-stream c test-bucket t-key t-stream)]
+    t-req)
+
+  (list-objects c test-bucket))
