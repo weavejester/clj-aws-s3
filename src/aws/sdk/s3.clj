@@ -285,6 +285,18 @@
         (throw ex))
       (finally (.shutdown pool)))))
 
+(defn- get-e-tags
+  [{input :stream :as upload} offset e-tags part-size]
+  (if-not (zero? (try (.available input)
+                      (catch java.io.IOException _ 0)))
+    (let [part-size (min (.available input) part-size)
+          ;; TODO: when to wait for the stream instead of finishing
+          e-tag (upload-part (assoc upload
+                               :offset offset
+                               :part-size part-size))]
+      (recur upload (inc offset) (conj e-tags e-tag) part-size))
+    (java.util.ArrayList. e-tags)))
+
 (defn put-multipart-stream
   "Like put-multipart-object, but it is single threaded and uses an input-stream
    instead of a file as the data source. The single threading is intentional,
@@ -293,19 +305,13 @@
   [cred bucket key input &[{:keys [part-size lock]
                             :or {part-size (* 5 1024 1024)
                                  lock (Object.)}}]]
-  (let [part-size (max 1024 (min (.available input) part-size))
-        upload-id (initiate-multipart-upload cred bucket key)
+  (let [upload-id (initiate-multipart-upload cred bucket key)
         upload {:upload-id upload-id
                 :cred cred
                 :bucket bucket
                 :key key
                 :stream input}
-        e-tags (loop [offset 0 e-tags []]
-                 (if (zero? (.available input))
-                   ;; TODO: know when to wait for the stream instead of finishing
-                   (java.util.ArrayList. e-tags)
-                   (let [e-tag (upload-part (assoc upload :offset offset :part-size part-size))]
-                     (recur (inc offset) (conj e-tags e-tag)))))]
+        e-tags (get-e-tags upload 0 [] part-size)]
     (try
       (complete-multipart-upload (assoc upload :e-tags e-tags))
       (catch Exception ex

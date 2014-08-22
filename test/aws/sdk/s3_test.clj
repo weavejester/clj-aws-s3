@@ -39,16 +39,13 @@
   (let [t-key    "test-key"
         t-value  (apply str (take 10 (repeat "testword ")))
         t-stream (io/input-stream (.getBytes t-value))
-        t-req    (put-multipart-stream *creds* test-bucket t-key t-value)]
+        t-req    (put-multipart-stream *creds* test-bucket t-key t-stream)]
     ))
+(comment
+  (let [t-key    "test-key"
+        t-value  (apply str (take 10 (repeat "testword ")))
+        t-stream (io/input-stream (.getBytes t-value))]
+    (put-multipart-stream *creds* test-bucket t-key t-stream))
 
-(let [t-key    "test-key"
-      t-value  (apply str (take 10 (repeat "testword ")))
-      t-stream (io/input-stream (.getBytes t-value))]
-    (put-multipart-stream c test-bucket t-key t-stream))
-
-(ByteArrayInputStream. (.getBytes (apply str (take 10 (repeat "testword ")))))
-
-(def c
-  {:access-key key
-   :secret-key skey})
+  (ByteArrayInputStream.
+   (.getBytes (apply str (take 10 (repeat "testword "))))))
