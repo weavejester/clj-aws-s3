@@ -40,7 +40,9 @@
         t-value  (apply str (take 10 (repeat "testword ")))
         t-stream (io/input-stream (.getBytes t-value))
         t-req    (put-multipart-stream *creds* test-bucket t-key t-stream)]
-    ))
+    (is (object-exists? *creds* test-bucket t-key))
+    (delete-object *creds* test-bucket t-key)))
+
 (comment
   (let [t-key    "test-key"
         t-value  (apply str (take 10 (repeat "testword ")))
