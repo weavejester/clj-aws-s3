@@ -295,12 +295,14 @@
    (constantly nil)})
 
 (defn put-multipart-object
-  "Do a multipart upload of a file into a S3 bucket at the specified key.
-  The value must be a java.io.File object.  The entire file is uploaded 
-  or not at all.  If an exception happens at any time the upload is aborted 
-  and the exception is rethrown. The size of the parts and the number of
-  threads uploading the parts can be configured in the last argument as a
-  map with the following keys:
+  "Do a multipart upload of a file or input-stream into a S3 bucket at the
+  specified key.
+  Files are uploaded in multiple threads, input-streams in a single thread.
+  The value must be a java.io.File object, or implement the java.io.InputStream
+  interface. The entire object is uploaded or not at all.  If an exception
+  happens at any time the upload is aborted and the exception is rethrown. The
+  size of the parts and the number of threads uploading the parts can be
+  configured in the last argument as a map with the following keys:
     :part-size - the size in bytes of each part of the file.  Must be 5mb
                  or larger.  Defaults to 5mb
     :threads   - the number of threads that will upload parts concurrently.
