@@ -254,7 +254,47 @@
               (.setInputStream stream)))
     (.getPartETag (.uploadPart (s3-client cred) request))))
 
-(defn put-multipart-file
+(defprotocol MultipartUpload
+  (multipart-upload [value upload options])
+  (cleanup [value upload options]))
+
+(extend java.io.File
+  MultipartUpload
+  {:multipart-upload
+   (fn [^java.io.File file upload {:keys [part-size threads]
+                                   :or {part-size (* 5 1024 1024) threads 16}}]
+     (let [upload (assoc upload :file file)
+           
+           pool      (Executors/newFixedThreadPool threads)
+           offsets   (range 0 (.length file) part-size)
+           tasks     (map #(fn [] (upload-part (assoc upload :offset %)))
+                          offsets)]
+       (assoc upload
+         :e-tags (map #(.get ^java.util.concurrent.Future %)
+                      (.invokeAll pool tasks))
+         :pool pool)))
+   :cleanup
+   (fn [file upload options]
+     (when-let [pool  (:pool upload)]
+       (.shutdown pool)))})
+
+(extend java.io.InputStream
+  MultipartUpload
+  {:multipart-upload
+   (fn [stream upload options]
+     (let [upload (assoc upload :stream stream)
+           e-tags ((fn get-e-tag [count]
+                     (lazy-seq
+                      (try 
+                        (cons (upload-part (assoc upload :offset count))
+                              (get-e-tag (inc count)))
+                        (catch java.io.IOException _ nil))))
+                   0)]
+       (assoc upload :e-tags e-tags)))
+   :cleanup
+   (constantly nil)})
+
+(defn put-multipart-object
   "Do a multipart upload of a file into a S3 bucket at the specified key.
   The value must be a java.io.File object.  The entire file is uploaded 
   or not at all.  If an exception happens at any time the upload is aborted 
@@ -265,54 +305,23 @@
                  or larger.  Defaults to 5mb
     :threads   - the number of threads that will upload parts concurrently.
                  Defaults to 16."
-  [cred bucket key ^java.io.File file & [{:keys [part-size threads]
-                            :or {part-size (* 5 1024 1024) threads 16}}]]
-  (let [upload-id (initiate-multipart-upload cred bucket key)
-        upload    {:upload-id upload-id :cred cred :bucket bucket :key key :file file}
-        pool      (Executors/newFixedThreadPool threads)
-        offsets   (range 0 (.length file) part-size)
-        tasks     (map #(fn [] (upload-part (assoc upload :offset % :part-size part-size)))
-                       offsets)]
-    (try
-      (complete-multipart-upload
-        (assoc upload :e-tags (map #(.get ^java.util.concurrent.Future %)  (.invokeAll pool tasks))))
-      (catch Exception ex 
-        (abort-multipart-upload upload) 
-        (.shutdown pool)
-        (throw ex))
-      (finally (.shutdown pool)))))
-
-(defn put-multipart-stream
-  "Like put-multipart-object, but it is single threaded and uses an input-stream
-   instead of a file as the data source."
-  [cred bucket key input &[{:keys [part-size lock]
-                            :or {part-size (* 5 1024 1024)}}]]
+  [cred bucket key object &[{:keys [part-size]
+                             :or {part-size (* 5 1024 1024)}
+                             :as opts}]]
   (let [upload-id (initiate-multipart-upload cred bucket key)
         upload {:upload-id upload-id
                 :cred cred
                 :bucket bucket
                 :key key
-                :part-size part-size
-                :stream input}
-        e-tags ((fn get-e-tag [count]
-                  (lazy-seq
-                   (try 
-                     (cons (upload-part (assoc upload :offset count))
-                           (get-e-tag (inc count)))
-                     (catch java.io.IOException _ nil))))
-                0)]
+                :part-size part-size}
+        upload (multipart-upload object upload opts)]
     (try
-      (complete-multipart-upload (assoc upload :e-tags e-tags))
-      (catch Exception ex
-        (abort-multipart-upload upload)
-        (throw ex)))))
-
-(defn put-multipart-object
-  "Do a multipart upload of object into an S3 bucket at the specified key."
-  [cred bucket key object & [opts]]
-  (if (isa? (class object) java.io.File)
-    (put-multipart-file cred bucket key object opts)
-    (put-multipart-stream cred bucket key object opts)))
+      (complete-multipart-upload upload)
+      (catch Exception ex 
+        (abort-multipart-upload upload) 
+        (cleanup object upload opts)
+        (throw ex))
+      (finally (cleanup object upload opts)))))
 
 (extend-protocol Mappable
   S3Object

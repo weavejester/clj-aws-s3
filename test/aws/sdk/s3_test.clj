@@ -39,7 +39,7 @@
   (let [t-key    "test-key"
         t-value  (apply str (take 3000 (repeat "testword ")))
         t-stream (io/input-stream (.getBytes t-value))
-        t-req    (put-multipart-stream *creds* test-bucket t-key t-stream)]
+        t-req    (put-multipart-object *creds* test-bucket t-key t-stream)]
     (is (object-exists? *creds* test-bucket t-key))
     (is (= (slurp (:content (get-object *creds* test-bucket t-key)))
            t-value))
