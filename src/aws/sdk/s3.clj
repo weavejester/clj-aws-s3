@@ -44,6 +44,7 @@
            com.amazonaws.services.s3.model.CompleteMultipartUploadRequest
            com.amazonaws.services.s3.model.UploadPartRequest
            java.util.concurrent.Executors
+           java.util.ArrayList
            java.io.ByteArrayInputStream
            java.io.File
            java.io.InputStream
@@ -254,7 +255,7 @@
               (.setInputStream stream)))
     (.getPartETag (.uploadPart (s3-client cred) request))))
 
-(defn put-multipart-object
+(defn put-multipart-file
   "Do a multipart upload of a file into a S3 bucket at the specified key.
   The value must be a java.io.File object.  The entire file is uploaded 
   or not at all.  If an exception happens at any time the upload is aborted 
@@ -287,16 +288,14 @@
   (case (try (Math/signum (double (.available input)))
              (catch java.io.IOException _ -1.0))
     ;; no more input available
-    -1.0  (java.util.ArrayList. e-tags)
+    -1.0  (ArrayList. e-tags)
     ;; no input at this time
     0.0 (do (Thread/sleep 200)
             (recur upload offset e-tags part-size))
     ;; some input available
-    1.0 (let [available (.available input)
-              this-part-size (min available part-size)
-              e-tag (upload-part (assoc upload
+    1.0 (let [e-tag (upload-part (assoc upload
                                    :offset offset
-                                   :part-size this-part-size))]
+                                   :part-size part-size))]
           (recur upload (inc offset) (conj e-tags e-tag) part-size))))
 
 (defn put-multipart-stream
@@ -316,6 +315,13 @@
       (catch Exception ex
         (abort-multipart-upload upload)
         (throw ex)))))
+
+(defn put-multipart-object
+  "Do a multipart upload of object into an S3 bucket at the specified key."
+  [cred bucket key object & [opts]]
+  (if (isa? (class object) java.io.File)
+    (put-multipart-file cred bucket key object opts)
+    (put-multipart-stream cred bucket key object opts)))
 
 (extend-protocol Mappable
   S3Object
