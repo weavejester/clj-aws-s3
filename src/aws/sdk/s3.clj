@@ -237,6 +237,7 @@
 (defn- upload-part
   [{cred :cred bucket :bucket key :key upload-id :upload-id
     part-size :part-size offset :offset file :file stream :stream}] 
+  {:pre [(not (and file stream))]}
   (let [request (UploadPartRequest.)]
     (doto request
       (.setBucketName bucket)
@@ -244,18 +245,14 @@
       (.setUploadId upload-id)
       (.setPartNumber (+ 1 (/ offset part-size)))
       (.setFileOffset offset))
-    (if file
-      ;; either file or stream must be passed in
-      (doto request
-        (.setPartSize (min part-size (- (.length file) offset)))
-        (.setFile file))
-      (doto request
-        (.setPartSize (min part-size (.available stream)))
-        (.setInputStream stream)))
-    (.getPartETag
-     (.uploadPart
-      (s3-client cred)
-      request))))
+    (cond
+     file (doto request
+            (.setPartSize (min part-size (- (.length file) offset)))
+            (.setFile file))
+     stream (doto request
+              (.setPartSize (min part-size (.available stream)))
+              (.setInputStream stream)))
+    (.getPartETag (.uploadPart (s3-client cred) request))))
 
 (defn put-multipart-object
   "Do a multipart upload of a file into a S3 bucket at the specified key.
@@ -287,24 +284,26 @@
 
 (defn- get-e-tags
   [{input :stream :as upload} offset e-tags part-size]
-  (if-not (zero? (try (.available input)
-                      (catch java.io.IOException _ 0)))
-    (let [part-size (min (.available input) part-size)
-          ;; TODO: when to wait for the stream instead of finishing
-          e-tag (upload-part (assoc upload
-                               :offset offset
-                               :part-size part-size))]
-      (recur upload (inc offset) (conj e-tags e-tag) part-size))
-    (java.util.ArrayList. e-tags)))
+  (case (try (Math/signum (double (.available input)))
+             (catch java.io.IOException _ -1.0))
+    ;; no more input available
+    -1.0  (java.util.ArrayList. e-tags)
+    ;; no input at this time
+    0.0 (do (Thread/sleep 200)
+            (recur upload offset e-tags part-size))
+    ;; some input available
+    1.0 (let [available (.available input)
+              this-part-size (min available part-size)
+              e-tag (upload-part (assoc upload
+                                   :offset offset
+                                   :part-size this-part-size))]
+          (recur upload (inc offset) (conj e-tags e-tag) part-size))))
 
 (defn put-multipart-stream
   "Like put-multipart-object, but it is single threaded and uses an input-stream
-   instead of a file as the data source. The single threading is intentional,
-   to allow for a future design where the input stream can lock in case upload
-   is faster than stream generation."
+   instead of a file as the data source."
   [cred bucket key input &[{:keys [part-size lock]
-                            :or {part-size (* 5 1024 1024)
-                                 lock (Object.)}}]]
+                            :or {part-size (* 5 1024 1024)}}]]
   (let [upload-id (initiate-multipart-upload cred bucket key)
         upload {:upload-id upload-id
                 :cred cred
