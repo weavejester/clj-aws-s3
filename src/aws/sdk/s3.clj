@@ -44,7 +44,6 @@
            com.amazonaws.services.s3.model.CompleteMultipartUploadRequest
            com.amazonaws.services.s3.model.UploadPartRequest
            java.util.concurrent.Executors
-           java.util.ArrayList
            java.io.ByteArrayInputStream
            java.io.File
            java.io.InputStream
@@ -283,21 +282,6 @@
         (throw ex))
       (finally (.shutdown pool)))))
 
-(defn- get-e-tags
-  [{input :stream :as upload} offset e-tags part-size]
-  (case (try (Math/signum (double (.available input)))
-             (catch java.io.IOException _ -1.0))
-    ;; no more input available
-    -1.0  (ArrayList. e-tags)
-    ;; no input at this time
-    0.0 (do (Thread/sleep 200)
-            (recur upload offset e-tags part-size))
-    ;; some input available
-    1.0 (let [e-tag (upload-part (assoc upload
-                                   :offset offset
-                                   :part-size part-size))]
-          (recur upload (inc offset) (conj e-tags e-tag) part-size))))
-
 (defn put-multipart-stream
   "Like put-multipart-object, but it is single threaded and uses an input-stream
    instead of a file as the data source."
@@ -308,8 +292,15 @@
                 :cred cred
                 :bucket bucket
                 :key key
+                :part-size part-size
                 :stream input}
-        e-tags (get-e-tags upload 0 [] part-size)]
+        e-tags ((fn get-e-tag [count]
+                  (lazy-seq
+                   (try 
+                     (cons (upload-part (assoc upload :offset count))
+                           (get-e-tag (inc count)))
+                     (catch java.io.IOException _ nil))))
+                0)]
     (try
       (complete-multipart-upload (assoc upload :e-tags e-tags))
       (catch Exception ex
