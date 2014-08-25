@@ -236,63 +236,64 @@
 
 (defn- upload-part
   [{cred :cred bucket :bucket key :key upload-id :upload-id
-    part-size :part-size offset :offset file :file stream :stream}] 
+    part-size :part-size offset :offset file :file stream :stream
+    part-number :part-number}]
   {:pre [(not (and file stream))]}
   (let [request (UploadPartRequest.)]
     (doto request
       (.setBucketName bucket)
       (.setKey key)
-      (.setUploadId upload-id)
-      (.setPartNumber (+ 1 (/ offset part-size)))
-      (.setFileOffset offset))
+      (.setUploadId upload-id))
     (cond
      file (doto request
             (.setPartSize (min part-size (- (.length file) offset)))
+            (.setPartNumber (+ 1 (/ offset part-size)))
+            (.setFileOffset offset)
             (.setFile file))
      stream (doto request
               (.setPartSize (min part-size (.available stream)))
+              (.setPartNumber part-number)
               (.setInputStream stream)))
     (.getPartETag (.uploadPart (s3-client cred) request))))
 
 (defprotocol MultipartUpload
-  (multipart-upload [value upload options])
-  (cleanup [value upload options]))
+  (multipart-upload [value upload options]))
 
-(extend java.io.File
-  MultipartUpload
-  {:multipart-upload
-   (fn [^java.io.File file upload {:keys [part-size threads]
-                                   :or {part-size (* 5 1024 1024) threads 16}}]
-     (let [upload (assoc upload :file file)
-           
-           pool      (Executors/newFixedThreadPool threads)
-           offsets   (range 0 (.length file) part-size)
-           tasks     (map #(fn [] (upload-part (assoc upload :offset %)))
-                          offsets)]
-       (assoc upload
-         :e-tags (map #(.get ^java.util.concurrent.Future %)
-                      (.invokeAll pool tasks))
-         :pool pool)))
-   :cleanup
-   (fn [file upload options]
-     (when-let [pool  (:pool upload)]
-       (.shutdown pool)))})
-
-(extend java.io.InputStream
-  MultipartUpload
-  {:multipart-upload
-   (fn [stream upload options]
-     (let [upload (assoc upload :stream stream)
-           e-tags ((fn get-e-tag [count]
-                     (lazy-seq
-                      (try 
-                        (cons (upload-part (assoc upload :offset count))
-                              (get-e-tag (inc count)))
-                        (catch java.io.IOException _ nil))))
-                   0)]
-       (assoc upload :e-tags e-tags)))
-   :cleanup
-   (constantly nil)})
+(extend-protocol MultipartUpload
+  java.io.File
+  (multipart-upload [^java.io.File file
+                     {:keys [part-size] :as upload}
+                     {:keys [threads] :as options
+                      :or {threads 16}}]
+    (let [upload  (assoc upload :file file)
+          pool    (Executors/newFixedThreadPool threads)
+          offsets (range 0 (.length file) part-size)]
+      (try (let [tasks (map #(fn [] (upload-part (assoc upload :offset %)))
+                            offsets)]
+             (complete-multipart-upload
+              (assoc upload
+                :e-tags (map #(.get ^java.util.concurrent.Future %)
+                             (.invokeAll pool tasks)))))
+           (catch Exception ex
+             (abort-multipart-upload upload)
+             (throw ex))
+           (finally
+             (.shutdown pool)))))
+  java.io.InputStream
+  (multipart-upload [stream upload options]
+    (try
+      (let [upload (assoc upload :stream stream)
+            e-tags ((fn get-e-tag [count]
+                      (lazy-seq
+                       (try
+                         (cons (upload-part (assoc upload :part-number count))
+                               (get-e-tag (inc count)))
+                         (catch java.io.IOException _ nil))))
+                    1)]
+        (complete-multipart-upload (assoc upload :e-tags e-tags)))
+      (catch Exception ex
+        (abort-multipart-upload upload)
+        (throw ex)))))
 
 (defn put-multipart-object
   "Do a multipart upload of a file or input-stream into a S3 bucket at the
@@ -315,15 +316,8 @@
                 :cred cred
                 :bucket bucket
                 :key key
-                :part-size part-size}
-        upload (multipart-upload object upload opts)]
-    (try
-      (complete-multipart-upload upload)
-      (catch Exception ex 
-        (abort-multipart-upload upload) 
-        (cleanup object upload opts)
-        (throw ex))
-      (finally (cleanup object upload opts)))))
+                :part-size part-size}]
+     (multipart-upload object upload opts)))
 
 (extend-protocol Mappable
   S3Object
