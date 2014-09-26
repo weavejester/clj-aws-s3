@@ -236,18 +236,23 @@
 
 (defn- upload-part
   [{cred :cred bucket :bucket key :key upload-id :upload-id
-    part-size :part-size offset :offset ^java.io.File file :file}] 
-  (.getPartETag
-   (.uploadPart
-    (s3-client cred)
-    (doto (UploadPartRequest.)
+    part-size :part-size offset :offset file :file stream :stream}] 
+  {:pre [(not (and file stream))]}
+  (let [request (UploadPartRequest.)]
+    (doto request
       (.setBucketName bucket)
       (.setKey key)
       (.setUploadId upload-id)
       (.setPartNumber (+ 1 (/ offset part-size)))
-      (.setFileOffset offset)
-      (.setPartSize ^long (min part-size (- (.length file) offset)))
-      (.setFile file)))))
+      (.setFileOffset offset))
+    (cond
+     file (doto request
+            (.setPartSize (min part-size (- (.length file) offset)))
+            (.setFile file))
+     stream (doto request
+              (.setPartSize (min part-size (.available stream)))
+              (.setInputStream stream)))
+    (.getPartETag (.uploadPart (s3-client cred) request))))
 
 (defn put-multipart-object
   "Do a multipart upload of a file into a S3 bucket at the specified key.
@@ -276,6 +281,41 @@
         (.shutdown pool)
         (throw ex))
       (finally (.shutdown pool)))))
+
+(defn- get-e-tags
+  [{input :stream :as upload} offset e-tags part-size]
+  (case (try (Math/signum (double (.available input)))
+             (catch java.io.IOException _ -1.0))
+    ;; no more input available
+    -1.0  (java.util.ArrayList. e-tags)
+    ;; no input at this time
+    0.0 (do (Thread/sleep 200)
+            (recur upload offset e-tags part-size))
+    ;; some input available
+    1.0 (let [available (.available input)
+              this-part-size (min available part-size)
+              e-tag (upload-part (assoc upload
+                                   :offset offset
+                                   :part-size this-part-size))]
+          (recur upload (inc offset) (conj e-tags e-tag) part-size))))
+
+(defn put-multipart-stream
+  "Like put-multipart-object, but it is single threaded and uses an input-stream
+   instead of a file as the data source."
+  [cred bucket key input &[{:keys [part-size lock]
+                            :or {part-size (* 5 1024 1024)}}]]
+  (let [upload-id (initiate-multipart-upload cred bucket key)
+        upload {:upload-id upload-id
+                :cred cred
+                :bucket bucket
+                :key key
+                :stream input}
+        e-tags (get-e-tags upload 0 [] part-size)]
+    (try
+      (complete-multipart-upload (assoc upload :e-tags e-tags))
+      (catch Exception ex
+        (abort-multipart-upload upload)
+        (throw ex)))))
 
 (extend-protocol Mappable
   S3Object
