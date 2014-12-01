@@ -43,6 +43,8 @@
            com.amazonaws.services.s3.model.AbortMultipartUploadRequest
            com.amazonaws.services.s3.model.CompleteMultipartUploadRequest
            com.amazonaws.services.s3.model.UploadPartRequest
+           com.amazonaws.services.s3.model.DeleteObjectsRequest
+           com.amazonaws.services.s3.model.DeleteObjectsRequest$KeyVersion
            java.util.concurrent.Executors
            java.io.ByteArrayInputStream
            java.io.File
@@ -446,6 +448,16 @@
   "Delete an object from an S3 bucket."
   [cred bucket key]
   (.deleteObject (s3-client cred) bucket key))
+
+(defn delete-objects
+  "Delete list of objects from an S3 bucket."
+  [cred bucket keys]
+  (let [key-versions (map (fn [key]
+                            (DeleteObjectsRequest$KeyVersion. key))
+                          keys)]
+    (.deleteObjects (s3-client cred)
+                    (doto (DeleteObjectsRequest. bucket)
+                      (.setKeys key-versions)))))
 
 (defn object-exists?
   "Returns true if an object exists in the supplied bucket and key."
