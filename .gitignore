@@ -10,3 +10,4 @@ pom.xml.asc
 .lein-env
 .lein-repl-history
 .nrepl-port
+test/aws/sdk/aws.clj
