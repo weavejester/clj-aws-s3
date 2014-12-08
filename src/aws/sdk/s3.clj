@@ -275,7 +275,7 @@
          (finally
            (.shutdown pool)))))
 
-(defn- upload-stream-part [stream upload options]
+(defn- upload-stream-part [stream upload]
   (try
     (let [upload (assoc upload :stream stream)
           e-tags ((fn get-e-tag [count]
@@ -311,9 +311,9 @@
                 :bucket bucket
                 :key key
                 :part-size part-size}]
-    (case (class object)
-      java.io.File        (upload-file-part object upload))
-      java.io.InputStream (upload-stream-part object upload)))
+    (cond
+     (= (class object) java.io.File)        (upload-file-part object upload opts)
+     (= (class object) java.io.InputStream) (upload-stream-part object upload))))
 
 (extend-protocol Mappable
   S3Object
