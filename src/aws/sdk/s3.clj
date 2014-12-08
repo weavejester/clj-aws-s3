@@ -256,44 +256,38 @@
               (.setInputStream stream)))
     (.getPartETag (.uploadPart (s3-client cred) request))))
 
-(defprotocol MultipartUpload
-  (multipart-upload [value upload options]))
+(defn- upload-file-part [^java.io.File file
+                         {:keys [part-size] :as upload}
+                         {:keys [threads] :as options
+                          :or {threads 16}}]
+  (let [upload  (assoc upload :file file)
+        pool    (Executors/newFixedThreadPool threads)
+        offsets (range 0 (.length file) part-size)
+        tasks   (map #(fn [] (upload-part (assoc upload :offset %))) offsets)
+        etags   (map #(.get ^java.util.concurrent.Future %)
+                     (.invokeAll pool tasks))]
+    (try (complete-multipart-upload
+          (assoc upload
+            :e-tags etags))
+         (catch Exception ex
+           (abort-multipart-upload upload)
+           (throw ex))
+         (finally
+           (.shutdown pool)))))
 
-(extend-protocol MultipartUpload
-  java.io.File
-  (multipart-upload [^java.io.File file
-                     {:keys [part-size] :as upload}
-                     {:keys [threads] :as options
-                      :or {threads 16}}]
-    (let [upload  (assoc upload :file file)
-          pool    (Executors/newFixedThreadPool threads)
-          offsets (range 0 (.length file) part-size)]
-      (try (let [tasks (map #(fn [] (upload-part (assoc upload :offset %)))
-                            offsets)]
-             (complete-multipart-upload
-              (assoc upload
-                :e-tags (map #(.get ^java.util.concurrent.Future %)
-                             (.invokeAll pool tasks)))))
-           (catch Exception ex
-             (abort-multipart-upload upload)
-             (throw ex))
-           (finally
-             (.shutdown pool)))))
-  java.io.InputStream
-  (multipart-upload [stream upload options]
-    (try
-      (let [upload (assoc upload :stream stream)
-            e-tags ((fn get-e-tag [count]
-                      (lazy-seq
-                       (try
-                         (cons (upload-part (assoc upload :part-number count))
-                               (get-e-tag (inc count)))
-                         (catch java.io.IOException _ nil))))
-                    1)]
-        (complete-multipart-upload (assoc upload :e-tags e-tags)))
-      (catch Exception ex
-        (abort-multipart-upload upload)
-        (throw ex)))))
+(defn- upload-stream-part [stream upload options]
+  (try
+    (let [upload (assoc upload :stream stream)
+          e-tags ((fn get-e-tag [count]
+                    (lazy-seq
+                     (try
+                       (cons (upload-part (assoc upload :part-number count))
+                             (get-e-tag (inc count)))
+                       (catch java.io.IOException _ nil)))) 1)]
+      (complete-multipart-upload (assoc upload :e-tags e-tags)))
+    (catch Exception ex
+      (abort-multipart-upload upload)
+      (throw ex))))
 
 (defn put-multipart-object
   "Do a multipart upload of a file or input-stream into a S3 bucket at the
@@ -317,7 +311,9 @@
                 :bucket bucket
                 :key key
                 :part-size part-size}]
-     (multipart-upload object upload opts)))
+    (case (class object)
+      java.io.File        (upload-file-part object upload))
+      java.io.InputStream (upload-stream-part object upload)))
 
 (extend-protocol Mappable
   S3Object
