@@ -236,81 +236,88 @@
 
 (defn- upload-part
   [{cred :cred bucket :bucket key :key upload-id :upload-id
-    part-size :part-size offset :offset file :file stream :stream}] 
+    part-size :part-size offset :offset file :file stream :stream
+    part-number :part-number}]
+  {:pre [(not (and file stream))]}
   (let [request (UploadPartRequest.)]
     (doto request
       (.setBucketName bucket)
       (.setKey key)
-      (.setUploadId upload-id)
-      (.setPartNumber (+ 1 (/ offset part-size)))
-      (.setFileOffset offset))
-    (if file
-      ;; either file or stream must be passed in
-      (doto request
-        (.setPartSize (min part-size (- (.length file) offset)))
-        (.setFile file))
-      (doto request
-        (.setPartSize (min part-size (.available stream)))
-        (.setInputStream stream)))
-    (.getPartETag
-     (.uploadPart
-      (s3-client cred)
-      request))))
+      (.setUploadId upload-id))
+    (cond
+     file (doto request
+            (.setPartSize (min part-size (- (.length file) offset)))
+            (.setPartNumber (+ 1 (/ offset part-size)))
+            (.setFileOffset offset)
+            (.setFile file))
+     stream (doto request
+              (.setPartSize (min part-size (.available stream)))
+              (.setPartNumber part-number)
+              (.setInputStream stream)))
+    (.getPartETag (.uploadPart (s3-client cred) request))))
+
+(defprotocol MultipartUpload
+  (multipart-upload [value upload options]))
+
+(extend-protocol MultipartUpload
+  java.io.File
+  (multipart-upload [^java.io.File file
+                     {:keys [part-size] :as upload}
+                     {:keys [threads] :as options
+                      :or {threads 16}}]
+    (let [upload  (assoc upload :file file)
+          pool    (Executors/newFixedThreadPool threads)
+          offsets (range 0 (.length file) part-size)]
+      (try (let [tasks (map #(fn [] (upload-part (assoc upload :offset %)))
+                            offsets)]
+             (complete-multipart-upload
+              (assoc upload
+                :e-tags (map #(.get ^java.util.concurrent.Future %)
+                             (.invokeAll pool tasks)))))
+           (catch Exception ex
+             (abort-multipart-upload upload)
+             (throw ex))
+           (finally
+             (.shutdown pool)))))
+  java.io.InputStream
+  (multipart-upload [stream upload options]
+    (try
+      (let [upload (assoc upload :stream stream)
+            e-tags ((fn get-e-tag [count]
+                      (lazy-seq
+                       (try
+                         (cons (upload-part (assoc upload :part-number count))
+                               (get-e-tag (inc count)))
+                         (catch java.io.IOException _ nil))))
+                    1)]
+        (complete-multipart-upload (assoc upload :e-tags e-tags)))
+      (catch Exception ex
+        (abort-multipart-upload upload)
+        (throw ex)))))
 
 (defn put-multipart-object
-  "Do a multipart upload of a file into a S3 bucket at the specified key.
-  The value must be a java.io.File object.  The entire file is uploaded 
-  or not at all.  If an exception happens at any time the upload is aborted 
-  and the exception is rethrown. The size of the parts and the number of
-  threads uploading the parts can be configured in the last argument as a
-  map with the following keys:
+  "Do a multipart upload of a file or input-stream into a S3 bucket at the
+  specified key.
+  Files are uploaded in multiple threads, input-streams in a single thread.
+  The value must be a java.io.File object, or implement the java.io.InputStream
+  interface. The entire object is uploaded or not at all.  If an exception
+  happens at any time the upload is aborted and the exception is rethrown. The
+  size of the parts and the number of threads uploading the parts can be
+  configured in the last argument as a map with the following keys:
     :part-size - the size in bytes of each part of the file.  Must be 5mb
                  or larger.  Defaults to 5mb
     :threads   - the number of threads that will upload parts concurrently.
                  Defaults to 16."
-  [cred bucket key ^java.io.File file & [{:keys [part-size threads]
-                            :or {part-size (* 5 1024 1024) threads 16}}]]
+  [cred bucket key object &[{:keys [part-size]
+                             :or {part-size (* 5 1024 1024)}
+                             :as opts}]]
   (let [upload-id (initiate-multipart-upload cred bucket key)
-        upload    {:upload-id upload-id :cred cred :bucket bucket :key key :file file}
-        pool      (Executors/newFixedThreadPool threads)
-        offsets   (range 0 (.length file) part-size)
-        tasks     (map #(fn [] (upload-part (assoc upload :offset % :part-size part-size)))
-                       offsets)]
-    (try
-      (complete-multipart-upload
-        (assoc upload :e-tags (map #(.get ^java.util.concurrent.Future %)  (.invokeAll pool tasks))))
-      (catch Exception ex 
-        (abort-multipart-upload upload) 
-        (.shutdown pool)
-        (throw ex))
-      (finally (.shutdown pool)))))
-
-(defn put-multipart-stream
-  "Like put-multipart-object, but it is single threaded and uses an input-stream
-   instead of a file as the data source. The single threading is intentional,
-   to allow for a future design where the input stream can lock in case upload
-   is faster than stream generation."
-  [cred bucket key input &[{:keys [part-size lock]
-                            :or {part-size (* 5 1024 1024)
-                                 lock (Object.)}}]]
-  (let [part-size (max 1024 (min (.available input) part-size))
-        upload-id (initiate-multipart-upload cred bucket key)
         upload {:upload-id upload-id
                 :cred cred
                 :bucket bucket
                 :key key
-                :stream input}
-        e-tags (loop [offset 0 e-tags []]
-                 (if (zero? (.available input))
-                   ;; TODO: know when to wait for the stream instead of finishing
-                   (java.util.ArrayList. e-tags)
-                   (let [e-tag (upload-part (assoc upload :offset offset :part-size part-size))]
-                     (recur (inc offset) (conj e-tags e-tag)))))]
-    (try
-      (complete-multipart-upload (assoc upload :e-tags e-tags))
-      (catch Exception ex
-        (abort-multipart-upload upload)
-        (throw ex)))))
+                :part-size part-size}]
+     (multipart-upload object upload opts)))
 
 (extend-protocol Mappable
   S3Object
