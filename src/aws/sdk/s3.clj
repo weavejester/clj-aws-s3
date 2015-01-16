@@ -442,7 +442,7 @@
     (s3-client cred)
     (map->ListObjectsRequest (merge {:bucket bucket} options)))))
 
-(defn lazy-list-object-keys
+(defn lazy-list-objects
   "Return a lazy sequence of object keys in an S3 bucket. See list-objects for options."
   [cred bucket & [options]]
   (let [{:keys [truncated? next-marker objects]} (list-objects cred bucket options)]
