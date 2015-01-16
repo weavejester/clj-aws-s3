@@ -444,14 +444,15 @@
 
 (defn lazy-list-object-keys
   "Return a lazy sequence of object keys in an S3 bucket. See list-objects for options."
-  ([cred bucket & [options]]
-   (letfn [(f [cred bucket options marker]
-             (let [res (list-objects cred bucket (merge options {:marker marker}))]
-               (if (:truncated? res)
-                 (concat (:objects res)
-                         (lazy-seq (f cred bucket options (:next-marker res))))
-                 (:objects res))))]
-     (f cred bucket options nil))))
+  [cred bucket & [options]]
+  (let [{:keys [truncated? next-marker objects]} (list-objects cred bucket options)]
+    (if truncated?
+      (concat objects
+              (lazy-seq (lazy-list-object-keys cred
+                                               bucket
+                                               (merge options
+                                                      {:marker next-marker}))))
+      objects)))
 
 (defn delete-object
   "Delete an object from an S3 bucket."
