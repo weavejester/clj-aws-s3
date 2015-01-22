@@ -448,7 +448,7 @@
   (let [{:keys [truncated? next-marker objects]} (list-objects cred bucket options)]
     (if truncated?
       (concat objects
-              (lazy-seq (lazy-list-object-keys cred
+              (lazy-seq (lazy-list-objects cred
                                                bucket
                                                (merge options
                                                       {:marker next-marker}))))
