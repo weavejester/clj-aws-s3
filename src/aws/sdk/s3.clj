@@ -23,6 +23,9 @@
            com.amazonaws.services.s3.model.Grant
            com.amazonaws.services.s3.model.CanonicalGrantee
            com.amazonaws.services.s3.model.CopyObjectResult
+           com.amazonaws.services.s3.model.DeleteObjectsRequest
+           com.amazonaws.services.s3.model.DeleteObjectsResult
+           com.amazonaws.services.s3.model.DeleteObjectsResult$DeletedObject
            com.amazonaws.services.s3.model.EmailAddressGrantee
            com.amazonaws.services.s3.model.GetObjectRequest
            com.amazonaws.services.s3.model.GetObjectMetadataRequest
@@ -343,7 +346,16 @@
      :expiration-time         (.getExpirationTime result)
      :expiration-time-rule-id (.getExpirationTimeRuleId result)
      :last-modified-date      (.getLastModifiedDate result)
-     :server-side-encryption  (.getServerSideEncryption result)}))
+     :server-side-encryption  (.getServerSideEncryption result)})
+  DeleteObjectsResult
+  (to-map [result]
+    {:objects (map to-map (.getDeletedObjects result))})
+  DeleteObjectsResult$DeletedObject
+  (to-map [object]
+    {:delete-marker-version-id (.getDeleteMarkerVersionId object)
+     :delete-marker?           (.isDeleteMarker object)
+     :key                      (.getKey object)
+     :version-id               (.getVersionId object)}))
 
 (defn get-object
   "Get an object from an S3 bucket. The object is returned as a map with the
@@ -446,6 +458,16 @@
   "Delete an object from an S3 bucket."
   [cred bucket key]
   (.deleteObject (s3-client cred) bucket key))
+
+(defn delete-objects
+  "Delete objects from an S3 bucket. A optional map of options may be supplied.
+  Available options are:
+  :quiet - Suppress responses from S3"
+  [cred bucket keys & [{:keys [quiet]}]]
+  (let [request (-> (DeleteObjectsRequest. bucket)
+                    (.withQuiet (boolean quiet))
+                    (.withKeys (into-array keys)))] ; No AWS .setKeys(string...)
+    (to-map (.deleteObjects (s3-client cred) request))))
 
 (defn object-exists?
   "Returns true if an object exists in the supplied bucket and key."
