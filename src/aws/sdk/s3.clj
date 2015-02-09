@@ -72,13 +72,13 @@
       (.setProxyDomain client-configuration proxy-domain))
     (when-let [proxy-workstation (get-in cred [:proxy :workstation])]
       (.setProxyWorkstation client-configuration proxy-workstation))
-    (let [aws-creds
-          (if (:token cred)
-            (BasicSessionCredentials. (:access-key cred) (:secret-key cred) (:token cred))
-            (BasicAWSCredentials. (:access-key cred) (:secret-key cred)))
-
-          client (AmazonS3Client. aws-creds client-configuration)]
-      (when-let [endpoint (:endpoint cred)]
+    (let [client (cond (and (:token cred) (:access-key cred) (:secret-key cred))
+                       (AmazonS3Client. (BasicSessionCredentials. (:access-key cred) (:secret-key cred) (:token cred)) client-configuration)
+                       (and (:access-key cred) (:secret-key cred))
+                       (AmazonS3Client. (BasicAWSCredentials. (:access-key cred) (:secret-key cred)) client-configuration)
+                       :else
+                       (AmazonS3Client. client-configuration))]
+     (when-let [endpoint (:endpoint cred)]
         (.setEndpoint client endpoint))
       client)))
 
