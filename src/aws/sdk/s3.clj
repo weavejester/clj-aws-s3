@@ -83,7 +83,7 @@
             (:access-key cred)  (BasicAWSCredentials.
                                   (:access-key cred)
                                   (:secret-key cred))
-            :else (.getCredentials (DefaultAWSCredentialsProviderChain.)))
+            :else (DefaultAWSCredentialsProviderChain.))
 
           client (AmazonS3Client. aws-creds client-configuration)]
       (when-let [endpoint (:endpoint cred)]
