@@ -372,9 +372,22 @@
   If these rules are not followed, the client can run out of resources by
   allocating too many open, but unused, HTTP connections."
   ([cred ^String bucket ^String key]
-     (to-map (.getObject (s3-client cred) bucket key)))
-  ([cred ^String bucket ^String key ^String version-id]
-     (to-map (.getObject (s3-client cred) (GetObjectRequest. bucket key version-id)))))
+   (to-map (.getObject (s3-client cred) bucket key)))
+  ;  ([cred ^String bucket ^String key ^String version-id]
+  ;    (to-map (.getObject (s3-client cred) (GetObjectRequest. bucket key version-id)))))
+  ([cred ^String bucket ^String key {:keys [version-id matching-etags nonmatching-etags modified-since unmodified-since] :as opts}]
+   (let [req (GetObjectRequest. bucket key)]
+     (when version-id
+       (.setVersionId req version-id))
+     (when matching-etags
+       (.setMatchingETagConstraints req matching-etags))
+     (when nonmatching-etags
+       (.setNonmatchingETagConstraints req nonmatching-etags))
+     (when modified-since
+       (.setModifiedSinceConstraint req modified-since))
+     (when unmodified-since
+       (.setUnmodifiedSinceConstraint req unmodified-since))
+     (to-map (.getObject (s3-client cred) req)))))
 
 (defn- map->GetObjectMetadataRequest
   "Create a ListObjectsRequest instance from a map of values."
