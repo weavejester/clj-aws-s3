@@ -42,6 +42,7 @@
            com.amazonaws.services.s3.model.InitiateMultipartUploadRequest
            com.amazonaws.services.s3.model.AbortMultipartUploadRequest
            com.amazonaws.services.s3.model.CompleteMultipartUploadRequest
+           com.amazonaws.services.s3.model.CopyPartRequest
            com.amazonaws.services.s3.model.UploadPartRequest
            java.util.concurrent.Executors
            java.io.ByteArrayInputStream
@@ -465,6 +466,58 @@
      (copy-object cred bucket src-key bucket dest-key))
   ([cred src-bucket src-key dest-bucket dest-key]
      (to-map (.copyObject (s3-client cred) src-bucket src-key dest-bucket dest-key))))
+
+(defn- copy-part
+  [{cred :cred source-bucket :source-bucket source-key :source-key
+    destination-bucket :bucket destination-key :key upload-id :upload-id
+    part-size :part-size file-size :file-size offset :offset}]
+  (.getPartETag
+    (.copyPart
+     (s3-client cred)
+     (doto (CopyPartRequest.)
+       (.setSourceBucketName source-bucket)
+       (.setSourceKey source-key)
+       (.setDestinationBucketName destination-bucket)
+       (.setDestinationKey destination-key)
+       (.setUploadId upload-id)
+       (.setPartNumber (+ 1 (/ offset part-size)))
+       (.setFirstByte (long offset))
+       (.setLastByte (long (min (+ part-size offset) (dec file-size))))))))
+
+(defn copy-multipart-object
+  "Do a multipart copy of a file from an S3 bucket at the specified source key
+  to another S3 bucket at the specified destination key. The entire file is
+  copied or not at all.  If an exception happens at any time the copy is aborted
+  and the exception is rethrown. The size of the parts and the number of threads
+  copying the parts can be configured in the last argument as a map with the
+  following keys:
+    :part-size - the size in bytes of each part of the file.  Must be 5mb
+                 or larger.  Defaults to 5mb
+    :threads   - the number of threads that will upload parts concurrently.
+                 Defaults to 16."
+  [cred source-bucket source-key destination-bucket destination-key
+   & [{:keys [part-size threads] :or {part-size (* 5 1024 1024) threads 16}}]]
+  (let [file-size (:content-length (get-object-metadata cred source-bucket source-key))
+        upload-id (initiate-multipart-upload cred destination-bucket destination-key)
+        upload    {:upload-id upload-id
+                   :cred cred
+                   :source-bucket source-bucket
+                   :source-key source-key
+                   :bucket destination-bucket
+                   :key destination-key
+                   :file-size file-size}
+        pool      (Executors/newFixedThreadPool threads)
+        offsets   (range 0 file-size part-size)
+        tasks     (map #(fn [] (copy-part (assoc upload :offset % :part-size part-size)))
+                       offsets)]
+    (try
+      (complete-multipart-upload
+        (assoc upload :e-tags (map #(.get ^java.util.concurrent.Future %)  (.invokeAll pool tasks))))
+      (catch Exception ex
+        (abort-multipart-upload upload)
+        (.shutdown pool)
+        (throw ex))
+      (finally (.shutdown pool)))))
 
 (defn- map->ListVersionsRequest
   "Create a ListVersionsRequest instance from a map of values."
