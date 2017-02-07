@@ -482,7 +482,10 @@
        (.setUploadId upload-id)
        (.setPartNumber (+ 1 (/ offset part-size)))
        (.setFirstByte (long offset))
-       (.setLastByte (long (min (+ part-size offset) (dec file-size))))))))
+       (.setLastByte (long
+                       (min
+                         (dec (+ part-size offset))
+                         (dec file-size))))))))
 
 (defn copy-multipart-object
   "Do a multipart copy of a file from an S3 bucket at the specified source key
