@@ -22,6 +22,7 @@
            com.amazonaws.services.s3.model.Bucket
            com.amazonaws.services.s3.model.Grant
            com.amazonaws.services.s3.model.CanonicalGrantee
+           com.amazonaws.services.s3.model.CannedAccessControlList
            com.amazonaws.services.s3.model.CopyObjectResult
            com.amazonaws.services.s3.model.EmailAddressGrantee
            com.amazonaws.services.s3.model.GetObjectRequest
@@ -208,12 +209,15 @@
 
   An optional list of grant functions can be provided after metadata.
   These functions will be applied to a clear ACL and the result will be
-  the ACL for the newly created object."
+  the ACL for the newly created object.  Alternatively, a CannedAccessControlList
+  may be provided."
   [cred bucket key value & [metadata & permissions]]
   (let [req (->> (merge (put-request value) metadata)
                  (->PutObjectRequest bucket key))]
     (when permissions
-      (.setAccessControlList req (create-acl permissions)))
+      (if (= CannedAccessControlList (-> permissions first type))
+        (.withCannedAcl req (first permissions))
+        (.setAccessControlList req (create-acl permissions))))
     (.putObject (s3-client cred) req)))
 
 (defn- initiate-multipart-upload
