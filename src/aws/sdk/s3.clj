@@ -43,6 +43,7 @@
            com.amazonaws.services.s3.model.AbortMultipartUploadRequest
            com.amazonaws.services.s3.model.CompleteMultipartUploadRequest
            com.amazonaws.services.s3.model.UploadPartRequest
+           com.amazonaws.services.s3.model.CopyPartRequest
            java.util.concurrent.Executors
            java.io.ByteArrayInputStream
            java.io.File
@@ -232,7 +233,7 @@
   [{cred :cred bucket :bucket key :key upload-id :upload-id e-tags :e-tags}] 
   (.completeMultipartUpload
     (s3-client cred)
-    (CompleteMultipartUploadRequest. bucket key upload-id e-tags)))
+    (CompleteMultipartUploadRequest. bucket key upload-id (java.util.ArrayList. e-tags))))
 
 (defn- upload-part
   [{cred :cred bucket :bucket key :key upload-id :upload-id
@@ -248,6 +249,20 @@
       (.setFileOffset offset)
       (.setPartSize ^long (min part-size (- (.length file) offset)))
       (.setFile file)))))
+
+(defn- copy-part
+  [{cred :cred upload-id :upload-id source-bucket :source-bucket source-key :source-key
+    target-bucket :bucket target-key :key part-num :part-num}]
+  (.getPartETag
+    (.copyPart
+      (s3-client cred)
+      (doto (CopyPartRequest.)
+        (.withDestinationBucketName target-bucket)
+        (.withDestinationKey target-key)
+        (.withSourceBucketName source-bucket)
+        (.withSourceKey source-key)
+        (.withUploadId upload-id)
+        (.withPartNumber part-num)))))
 
 (defn put-multipart-object
   "Do a multipart upload of a file into a S3 bucket at the specified key.
@@ -276,6 +291,22 @@
         (.shutdown pool)
         (throw ex))
       (finally (.shutdown pool)))))
+
+(defn concat-keys
+  "Efficiently concatenates keys on S3 using multi-part upload API.
+  Please note that each part must be at least 5mb in size."
+  [cred target-bucket target-key source-bucket & source-keys]
+  (let [upload-id (initiate-multipart-upload cred target-bucket target-key)
+        upload {:upload-id upload-id :cred cred :bucket target-bucket :key target-key :source-bucket source-bucket}]
+    (try
+      (loop [part-num 1 source-keys source-keys e-tags '()]
+        (if (seq source-keys)
+          (recur (inc part-num) (next source-keys)
+                 (conj e-tags (copy-part (assoc upload :source-key (first source-keys) :part-num part-num))))
+          (complete-multipart-upload (assoc upload :e-tags e-tags))))
+      (catch Exception ex
+        (abort-multipart-upload upload)
+        (throw ex)))))
 
 (extend-protocol Mappable
   S3Object
