@@ -15,6 +15,7 @@
   (:import com.amazonaws.auth.BasicAWSCredentials
            com.amazonaws.auth.BasicSessionCredentials
            com.amazonaws.services.s3.AmazonS3Client
+           com.amazonaws.services.s3.S3ClientOptions
            com.amazonaws.AmazonServiceException
            com.amazonaws.ClientConfiguration
            com.amazonaws.HttpMethod
@@ -80,6 +81,11 @@
           client (AmazonS3Client. aws-creds client-configuration)]
       (when-let [endpoint (:endpoint cred)]
         (.setEndpoint client endpoint))
+      (when (:path-style-access cred)
+        (.setS3ClientOptions
+          client
+          (doto (S3ClientOptions.)
+            (.withPathStyleAccess true))))
       client)))
 
 (def ^{:private true :tag AmazonS3Client}
