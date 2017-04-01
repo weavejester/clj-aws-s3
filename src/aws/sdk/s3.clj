@@ -20,6 +20,7 @@
            com.amazonaws.HttpMethod
            com.amazonaws.services.s3.model.AccessControlList
            com.amazonaws.services.s3.model.Bucket
+           com.amazonaws.services.s3.model.BucketWebsiteConfiguration
            com.amazonaws.services.s3.model.Grant
            com.amazonaws.services.s3.model.CanonicalGrantee
            com.amazonaws.services.s3.model.CopyObjectResult
@@ -35,6 +36,9 @@
            com.amazonaws.services.s3.model.ObjectListing
            com.amazonaws.services.s3.model.Permission
            com.amazonaws.services.s3.model.PutObjectRequest
+           com.amazonaws.services.s3.model.RedirectRule
+           com.amazonaws.services.s3.model.RoutingRule
+           com.amazonaws.services.s3.model.RoutingRuleCondition
            com.amazonaws.services.s3.model.S3Object
            com.amazonaws.services.s3.model.S3ObjectSummary
            com.amazonaws.services.s3.model.S3VersionSummary
@@ -100,6 +104,27 @@
   (to-map [owner]
     {:id           (.getId owner)
      :display-name (.getDisplayName owner)})
+  BucketWebsiteConfiguration
+  (to-map [config]
+    {:index-document-suffix (.getIndexDocumentSuffix config)
+     :error-document (.getErrorDocument config)
+     :redirect-all-requests-to (to-map (.getRedirectAllRequestsTo config))
+     :routing-rules (map to-map (.getRoutingRules config))})
+  RedirectRule
+  (to-map [rule]
+    {:host-name (.getHostName rule)
+     :http-redirect-code (.getHttpRedirectCode rule)
+     :protocol (.getprotocol rule)
+     :replace-key-prefix-with (.getReplaceKeyPrefixWith rule)
+     :replace-key-with (.getReplaceKeyWith rule)})
+  RoutingRule
+  (to-map [rule]
+    {:redirect (to-map (.getRedirect rule))
+     :condition (to-map (.getCondition rule))})
+  RoutingRuleCondition
+  (to-map [condition]
+    {:http-error-code-returned-equals (.getHttpErrorCodeReturnedEquals condition)
+     :key-prefix-equals (.getKeyPrefixEquals condition)})
   nil
   (to-map [_] nil))
 
@@ -563,6 +588,37 @@
   [cred ^String bucket]
   (to-map (.getBucketAcl (s3-client cred) bucket)))
 
+(defn get-bucket-website-config
+  "Get the website conifiguration for the supplied bucket.  The configuration
+  is a map containing the following keys:
+     :routing-rules - list of routing rules
+     :redirect-all-requests-to - a redirect rule for all requests
+     :index-document-suffix - the value for the index document
+     :error-document - the value for the error document
+
+   The routing rules themselves are maps with keys:
+      :redirect - a redirect rule
+      :condition - a routing rule condition
+
+   The redirects and redirect-all-requests-to are maps with keys:
+      :host-name - the host name used in the reponse's Location header
+      :http-redirect-code - the HTTP redirect code used in the response's
+                             Location header
+      :protocol - the protocol, http or https, used in the response's
+                  Location header
+      :replace-key-with - the object key used in the response's Location header
+      :replace-key-prefix-with - the object key name prefix that will replace
+                                 the value of KeyPrefixEquals in the redirect
+                                 request.
+
+   The routing rule condition themselves are maps with keys:
+      :http-error-code-returned-equals - The HTTP error code that must match
+                                         for the redirect to apply
+      :key-prefix-equals - The object key name prefix from which
+                           requests will be redirected."
+  [cred name]
+  (to-map (.getBucketWebsiteConfiguration (s3-client cred) name)))
+
 (defn get-object-acl
   "Get the access control list (ACL) for the supplied object. See get-bucket-acl
   for a detailed description of the return value."
@@ -625,6 +681,81 @@
   (let [acl (.getBucketAcl (s3-client cred) bucket)]
     (update-acl acl funcs)
     (.setBucketAcl (s3-client cred) bucket acl)))
+
+(defn- map->RoutingRuleCondition
+  "Create a RoutingRuleCondition instance from a map of values"
+  ^RoutingRuleCondition
+  [request]
+  (doto (RoutingRuleCondition.)
+    (set-attr .setKeyPrefixEquals (:key-prefix-equals request))
+    (set-attr .setHttpErrorCodeReturnedEquals
+              (:http-error-code-returned-equals request))))
+
+(defn- map->RedirectRule
+  "Create a RedirectRule instance from a map of values"
+  ^RedirectRule
+  [request]
+  (when request
+    (doto (RedirectRule.)
+      (set-attr .setHostName (:host-name request))
+      (set-attr .setHttpRedirectCode (:http-redirect-code request))
+      (set-attr .setProtocol (:protocol request))
+      (set-attr .setReplaceKeyPrefixWith (:replace-key-prefix-with request))
+      (set-attr .setReplaceKeyWith (:replace-key-with request)))))
+
+(defn- map->RoutingRule
+  "Create a RoutingRule instance from a map of values."
+  ^RoutingRule
+  [request]
+  (doto (RoutingRule.)
+    (set-attr .setRedirect (map->RedirectRule (:redirect request)))
+    (set-attr .setCondition (map->RoutingRuleCondition (:condition request)))))
+
+(defn map->BucketWebsiteConfiguration
+  "Create a BucketWebsiteConfiguration instance from a map of values"
+  ^BucketWebsiteConfiguration
+  [request]
+  (doto (BucketWebsiteConfiguration.)
+    (set-attr .setIndexDocumentSuffix (:index-document-suffix request))
+    (set-attr .setErrorDocument (:error-document request))
+    (set-attr .setRedirectAllRequestsTo
+              (map->RedirectRule (:redirect-all-requests-to request)))
+    (set-attr .setRoutingRules (map map->RoutingRule (:routing-rules request)))))
+
+(defn update-bucket-website-configuration
+  "Update the website conifiguration for the supplied bucket.
+
+  The configuration is a map containing the following keys:
+     :routing-rules - list of routing rules
+     :redirect-all-requests-to - a redirect rule for all requests
+     :index-document-suffix - the value for the index document
+     :error-document - the value for the error document
+
+   The routing rules themselves are maps with keys:
+      :redirect - a redirect rule
+      :condition - a routing rule condition
+
+   The redirects and redirect-all-requests-to are maps with keys:
+      :host-name - the host name used in the reponse's Location header
+      :http-redirect-code - the HTTP redirect code used in the response's
+                             Location header
+      :protocol - the protocol, http or https, used in the response's
+                  Location header
+      :replace-key-with - the object key used in the response's Location header
+      :replace-key-prefix-with - the object key name prefix that will replace
+                                 the value of KeyPrefixEquals in the redirect
+                                 request.
+
+   The routing rule condition themselves are maps with keys:
+      :http-error-code-returned-equals - The HTTP error code that must match
+                                         for the redirect to apply
+      :key-prefix-equals - The object key name prefix from which
+                           requests will be redirected."
+  [cred name configuration]
+  (let [configuration-bean (map->BucketWebsiteConfiguration configuration)]
+    (.setBucketWebsiteConfiguration (s3-client cred)
+                                    name
+                                    configuration-bean)))
 
 (defn update-object-acl
   "Updates the access control list (ACL) for the supplied object using functions
