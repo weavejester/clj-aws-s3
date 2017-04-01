@@ -217,26 +217,26 @@
     (.putObject (s3-client cred) req)))
 
 (defn- initiate-multipart-upload
-  [cred bucket key] 
-  (.getUploadId (.initiateMultipartUpload 
-                  (s3-client cred) 
+  [cred bucket key]
+  (.getUploadId (.initiateMultipartUpload
+                  (s3-client cred)
                   (InitiateMultipartUploadRequest. bucket key))))
 
 (defn- abort-multipart-upload
-  [{cred :cred bucket :bucket key :key upload-id :upload-id}] 
-  (.abortMultipartUpload 
-    (s3-client cred) 
+  [{cred :cred bucket :bucket key :key upload-id :upload-id}]
+  (.abortMultipartUpload
+    (s3-client cred)
     (AbortMultipartUploadRequest. bucket key upload-id)))
 
 (defn- complete-multipart-upload
-  [{cred :cred bucket :bucket key :key upload-id :upload-id e-tags :e-tags}] 
+  [{cred :cred bucket :bucket key :key upload-id :upload-id e-tags :e-tags}]
   (.completeMultipartUpload
     (s3-client cred)
     (CompleteMultipartUploadRequest. bucket key upload-id e-tags)))
 
 (defn- upload-part
   [{cred :cred bucket :bucket key :key upload-id :upload-id
-    part-size :part-size offset :offset ^java.io.File file :file}] 
+    part-size :part-size offset :offset ^java.io.File file :file}]
   (.getPartETag
    (.uploadPart
     (s3-client cred)
@@ -251,8 +251,8 @@
 
 (defn put-multipart-object
   "Do a multipart upload of a file into a S3 bucket at the specified key.
-  The value must be a java.io.File object.  The entire file is uploaded 
-  or not at all.  If an exception happens at any time the upload is aborted 
+  The value must be a java.io.File object.  The entire file is uploaded
+  or not at all.  If an exception happens at any time the upload is aborted
   and the exception is rethrown. The size of the parts and the number of
   threads uploading the parts can be configured in the last argument as a
   map with the following keys:
@@ -271,8 +271,8 @@
     (try
       (complete-multipart-upload
         (assoc upload :e-tags (map #(.get ^java.util.concurrent.Future %)  (.invokeAll pool tasks))))
-      (catch Exception ex 
-        (abort-multipart-upload upload) 
+      (catch Exception ex
+        (abort-multipart-upload upload)
         (.shutdown pool)
         (throw ex))
       (finally (.shutdown pool)))))
@@ -441,6 +441,18 @@
    (.listObjects
     (s3-client cred)
     (map->ListObjectsRequest (merge {:bucket bucket} options)))))
+
+(defn lazy-list-objects
+  "Return a lazy sequence of objects in an S3 bucket. See list-objects for options."
+  [cred bucket & [options]]
+  (let [{:keys [truncated? next-marker objects]} (list-objects cred bucket options)]
+    (if truncated?
+      (concat objects
+              (lazy-seq (lazy-list-objects cred
+                                               bucket
+                                               (merge options
+                                                      {:marker next-marker}))))
+      objects)))
 
 (defn delete-object
   "Delete an object from an S3 bucket."
