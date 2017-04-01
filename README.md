@@ -1,5 +1,15 @@
 # clj-aws-s3
 
+## DEPRECATION NOTICE
+
+This project is **DEPRECATED** and **UNMAINTAINED**. A better
+alternative to this library is to use [Amazonica][]. Alternatively,
+you're more than welcome to fork this project.
+
+[amazonica]: https://github.com/mcohen01/amazonica
+
+## Introduction
+
 A Clojure library for accessing Amazon S3, based on the official AWS
 Java SDK.
 
