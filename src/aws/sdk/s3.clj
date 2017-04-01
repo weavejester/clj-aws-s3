@@ -108,6 +108,12 @@
   [cred name]
   (.doesBucketExist (s3-client cred) name))
 
+(defn bucket-exists-in-account?
+  "Returns true if the supplied bucket name already exists in
+  your account".
+  [cred name]
+  (some #{name} (map :name (s3/list-buckets cred))))
+
 (defn create-bucket
   "Create a new S3 bucket with the supplied name."
   [cred ^String name]
