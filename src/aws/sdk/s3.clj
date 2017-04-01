@@ -12,7 +12,8 @@
             [clj-time.core :as t]
             [clj-time.coerce :as coerce]
             [clojure.walk :as walk])
-  (:import com.amazonaws.auth.BasicAWSCredentials
+  (:import com.amazonaws.auth.AWSCredentials
+           com.amazonaws.auth.BasicAWSCredentials
            com.amazonaws.auth.BasicSessionCredentials
            com.amazonaws.services.s3.AmazonS3Client
            com.amazonaws.AmazonServiceException
@@ -77,7 +78,7 @@
             (BasicSessionCredentials. (:access-key cred) (:secret-key cred) (:token cred))
             (BasicAWSCredentials. (:access-key cred) (:secret-key cred)))
 
-          client (AmazonS3Client. aws-creds client-configuration)]
+          client (AmazonS3Client. ^AWSCredentials aws-creds ^ClientConfiguration client-configuration)]
       (when-let [endpoint (:endpoint cred)]
         (.setEndpoint client endpoint))
       client)))
