@@ -14,6 +14,7 @@
             [clojure.walk :as walk])
   (:import com.amazonaws.auth.BasicAWSCredentials
            com.amazonaws.auth.BasicSessionCredentials
+           com.amazonaws.auth.DefaultAWSCredentialsProviderChain
            com.amazonaws.services.s3.AmazonS3Client
            com.amazonaws.AmazonServiceException
            com.amazonaws.ClientConfiguration
@@ -73,9 +74,16 @@
     (when-let [proxy-workstation (get-in cred [:proxy :workstation])]
       (.setProxyWorkstation client-configuration proxy-workstation))
     (let [aws-creds
-          (if (:token cred)
-            (BasicSessionCredentials. (:access-key cred) (:secret-key cred) (:token cred))
-            (BasicAWSCredentials. (:access-key cred) (:secret-key cred)))
+          (cond
+            (:creds cred) (:creds cred)
+            (:token cred) (BasicSessionCredentials.
+                            (:access-key cred)
+                            (:secret-key cred)
+                            (:token cred))
+            (:access-key cred)  (BasicAWSCredentials.
+                                  (:access-key cred)
+                                  (:secret-key cred))
+            :else (DefaultAWSCredentialsProviderChain.))
 
           client (AmazonS3Client. aws-creds client-configuration)]
       (when-let [endpoint (:endpoint cred)]
